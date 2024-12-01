@@ -8,7 +8,9 @@ import requests
 import os
 
 app = Flask(__name__)
-CORS(app)  # Enable CORS for all routes
+
+# Enable CORS for specific origins
+CORS(app, resources={r"/*": {"origins": "*"}})
 
 # Set a maximum upload size (e.g., 5MB)
 app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024  # 5MB
@@ -60,7 +62,7 @@ def get_current_time(city=None, timezone=None):
         if timezone:
             tz = pytz.timezone(timezone)
         else:
-            tz = pytz.timezone("UTC")  # Default to UTC if timezone is not provided
+            tz = pytz.timezone("UTC")
         return datetime.now(tz).strftime("%Y-%m-%d %H:%M:%S")
     except Exception as e:
         return f"Error fetching time: {str(e)}"
