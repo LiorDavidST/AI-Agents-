@@ -14,11 +14,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Event listeners for send buttons
     openaiSendBtn.addEventListener("click", async () => {
-        await handleChat(openaiUserInput, openaiChatBody, "http://127.0.0.1:5002/api/openai-chat");
+        await handleChat(openaiUserInput, openaiChatBody, "http://127.0.0.1:5000/api/openai-chat");
     });
 
     cohereSendBtn.addEventListener("click", async () => {
-        await handleChat(cohereUserInput, cohereChatBody, "http://127.0.0.1:5002/api/cohere-chat");
+        await handleChat(cohereUserInput, cohereChatBody, "http://127.0.0.1:5000/api/cohere-chat");
     });
 
     // Event listeners for clear buttons
