@@ -40,3 +40,47 @@
 </body>
 <script src="script.js"></script>
 </html>
+=======
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generative AI Chats</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Chat Containers -->
+    <div id="chats-container">
+        <!-- OpenAI Chat -->
+        <div id="openai-chat" class="chat-container">
+            <header class="chat-header">
+                <h2>OpenAI Chat</h2>
+                <button id="close-openai-chat" aria-label="Close">×</button>
+            </header>
+            <div id="openai-chat-body" class="chat-body"></div>
+            <footer class="chat-footer">
+                <input type="text" id="openai-user-input" placeholder="Type your message...">
+                <button id="openai-send-btn">Send</button>
+                <button id="openai-clear-btn">Clear Chat</button>
+            </footer>
+        </div>
+
+        <!-- Cohere Chat -->
+        <div id="cohere-chat" class="chat-container">
+            <header class="chat-header">
+                <h2>Cohere Chat</h2>
+                <button id="close-cohere-chat" aria-label="Close">×</button>
+            </header>
+            <div id="cohere-chat-body" class="chat-body"></div>
+            <footer class="chat-footer">
+                <input type="text" id="cohere-user-input" placeholder="Type your message...">
+                <button id="cohere-send-btn">Send</button>
+                <button id="cohere-clear-btn">Clear Chat</button>
+            </footer>
+        </div>
+    </div>
+</body>
+<script src="script.js"></script>
+</html>
+

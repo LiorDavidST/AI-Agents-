@@ -155,3 +155,162 @@ def cohere_chat():
 
 if __name__ == "__main__":
     app.run(debug=True, port=5002)
+=======
+from flask import Flask, request, jsonify, send_from_directory
+from flask_cors import CORS
+import openai
+import cohere
+from datetime import datetime
+import pytz
+import requests
+
+app = Flask(__name__)
+CORS(app)  # Enable CORS for all routes
+
+# Set a maximum upload size (e.g., 5MB)
+app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024  # 5MB
+
+# OpenAI API Key
+OPENAI_API_KEY = "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"
+
+openai.api_key = OPENAI_API_KEY
+
+# Cohere API Key
+COHERE_API_KEY = "3be40PX2Rotm3hnR7eftzrLL7HDPRMb38buJ61TY"
+co = cohere.Client(COHERE_API_KEY)
+
+# WeatherAPI Key
+WEATHER_API_KEY = "2551aefbcd6149f8aac114636240112"  # Replace with your WeatherAPI key
+
+# Helper function: Get weather data
+def get_weather(city="London"):
+    try:
+        # WeatherAPI endpoint
+        url = f"http://api.weatherapi.com/v1/current.json?key={WEATHER_API_KEY}&q={city}"
+        response = requests.get(url)
+        if response.status_code == 200:
+            data = response.json()
+            temp = data["current"]["temp_c"]
+            description = data["current"]["condition"]["text"]
+            return f"The current weather in {city} is {temp}°C with {description}."
+        else:
+            return "Unable to fetch weather data at the moment. Please try again later."
+    except Exception as e:
+        return f"Error fetching weather: {str(e)}"
+
+# Helper function: Get user's location from IP
+def get_user_location(ip_address=""):
+    try:
+        url = f"https://ipinfo.io/{ip_address}?token=YOUR_IPINFO_API_KEY"
+        response = requests.get(url)
+        if response.status_code == 200:
+            data = response.json()
+            city = data.get("city", None)
+            country = data.get("country", None)
+            timezone = data.get("timezone", None)
+            return city, country, timezone
+        return None, None, None
+    except Exception as e:
+        return None, None, None
+
+# Helper function: Get current time in a given timezone
+def get_current_time(city=None, timezone=None):
+    try:
+        if timezone:
+            tz = pytz.timezone(timezone)
+        else:
+            tz = pytz.timezone("UTC")  # Default to UTC if timezone is not provided
+        return datetime.now(tz).strftime("%Y-%m-%d %H:%M:%S")
+    except Exception as e:
+        return f"Error fetching time: {str(e)}"
+
+# Serve static files (Frontend)
+@app.route("/", methods=["GET"])
+def serve_index():
+    return send_from_directory(".", "index.html")
+
+@app.route("/<path:path>", methods=["GET"])
+def serve_static_files(path):
+    return send_from_directory(".", path)
+
+# OpenAI Chat Route
+@app.route("/api/openai-chat", methods=["POST"])
+def openai_chat():
+    data = request.json
+    user_message = data.get("message", "")
+    user_ip = request.remote_addr  # Get user's IP address
+
+    # Detect location
+    city, country, timezone = get_user_location(user_ip)
+
+    # Handle specific requests
+    if "time" in user_message.lower():
+        if timezone:
+            current_time = get_current_time(city, timezone)
+            return jsonify({"reply": f"The current time in {city} ({country}) is {current_time}."})
+        else:
+            return jsonify({"reply": "I couldn't determine your location. Please provide your city for the current time."})
+
+    if "weather" in user_message.lower():
+        user_city = user_message.split("in")[-1].strip() if "in" in user_message.lower() else city
+        if user_city:
+            return jsonify({"reply": get_weather(user_city)})
+        else:
+            return jsonify({"reply": "I couldn't determine your location. Please provide your city for the weather information."})
+
+    # General OpenAI Chat
+    try:
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant using OpenAI."},
+                {"role": "user", "content": user_message}
+            ],
+            max_tokens=150,
+            temperature=0.7
+        )
+        reply = response['choices'][0]['message']['content'].strip()
+        return jsonify({"reply": reply})
+    except Exception as e:
+        return jsonify({"error": f"Internal Server Error: {str(e)}"}), 500
+
+# Cohere Chat Route
+@app.route("/api/cohere-chat", methods=["POST"])
+def cohere_chat():
+    data = request.json
+    user_message = data.get("message", "")
+    user_ip = request.remote_addr  # Get user's IP address
+
+    # Detect location
+    city, country, timezone = get_user_location(user_ip)
+
+    # Handle specific requests
+    if "time" in user_message.lower():
+        if timezone:
+            current_time = get_current_time(city, timezone)
+            return jsonify({"reply": f"The current time in {city} ({country}) is {current_time}."})
+        else:
+            return jsonify({"reply": "I couldn't determine your location. Please provide your city for the current time."})
+
+    if "weather" in user_message.lower():
+        user_city = user_message.split("in")[-1].strip() if "in" in user_message.lower() else city
+        if user_city:
+            return jsonify({"reply": get_weather(user_city)})
+        else:
+            return jsonify({"reply": "I couldn't determine your location. Please provide your city for the weather information."})
+
+    # General Cohere Chat
+    try:
+        response = co.generate(
+            model="command-xlarge-nightly",
+            prompt=f"User: {user_message}\nAssistant:",
+            max_tokens=150,
+            temperature=0.7
+        )
+        reply = response.generations[0].text.strip()
+        return jsonify({"reply": reply})
+    except Exception as e:
+        return jsonify({"error": f"Internal Server Error: {str(e)}"}), 500
+
+if __name__ == "__main__":
+    app.run(debug=True, port=5002)
