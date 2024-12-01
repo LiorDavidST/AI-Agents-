@@ -9,7 +9,7 @@ import os
 
 app = Flask(__name__)
 
-# Enable CORS for specific origins
+# Enable CORS for all routes
 CORS(app, resources={r"/*": {"origins": "*"}})
 
 # Set a maximum upload size (e.g., 5MB)
