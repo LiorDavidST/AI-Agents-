@@ -179,7 +179,7 @@ COHERE_API_KEY = "COHERE_API_KEY"
 co = cohere.Client(COHERE_API_KEY)
 
 # WeatherAPI Key
-WEATHER_API_KEY = "2551aefbcd6149f8aac114636240112"  # Replace with your WeatherAPI key
+WEATHER_API_KEY = "WEATHER_API_KEY"  # Replace with your WeatherAPI key
 
 # Helper function: Get weather data
 def get_weather(city="London"):
