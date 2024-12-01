@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Generative AI Chats</title>
     <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 </head>
 <body>
     <!-- Chat Containers -->
@@ -13,13 +16,15 @@
         <div id="openai-chat" class="chat-container">
             <header class="chat-header">
                 <h2>OpenAI Chat</h2>
-                <button id="close-openai-chat" aria-label="Close">×</button>
+                <button id="close-openai-chat" aria-label="Close">
+                    <i class="fas fa-times"></i>
+                </button>
             </header>
             <div id="openai-chat-body" class="chat-body"></div>
             <footer class="chat-footer">
-                <input type="text" id="openai-user-input" placeholder="Type your message...">
-                <button id="openai-send-btn">Send</button>
-                <button id="openai-clear-btn">Clear Chat</button>
+                <input type="text" id="openai-user-input" placeholder="Type your message..." aria-label="OpenAI message input">
+                <button id="openai-send-btn" aria-label="Send message">Send</button>
+                <button id="openai-clear-btn" aria-label="Clear chat">Clear Chat</button>
             </footer>
         </div>
 
@@ -27,60 +32,19 @@
         <div id="cohere-chat" class="chat-container">
             <header class="chat-header">
                 <h2>Cohere Chat</h2>
-                <button id="close-cohere-chat" aria-label="Close">×</button>
+                <button id="close-cohere-chat" aria-label="Close">
+                    <i class="fas fa-times"></i>
+                </button>
             </header>
             <div id="cohere-chat-body" class="chat-body"></div>
             <footer class="chat-footer">
-                <input type="text" id="cohere-user-input" placeholder="Type your message...">
-                <button id="cohere-send-btn">Send</button>
-                <button id="cohere-clear-btn">Clear Chat</button>
+                <input type="text" id="cohere-user-input" placeholder="Type your message..." aria-label="Cohere message input">
+                <button id="cohere-send-btn" aria-label="Send message">Send</button>
+                <button id="cohere-clear-btn" aria-label="Clear chat">Clear Chat</button>
             </footer>
         </div>
     </div>
-</body>
-<script src="script.js"></script>
-</html>
-=======
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Generative AI Chats</title>
-    <link rel="stylesheet" href="style.css">
-</head>
-<body>
-    <!-- Chat Containers -->
-    <div id="chats-container">
-        <!-- OpenAI Chat -->
-        <div id="openai-chat" class="chat-container">
-            <header class="chat-header">
-                <h2>OpenAI Chat</h2>
-                <button id="close-openai-chat" aria-label="Close">×</button>
-            </header>
-            <div id="openai-chat-body" class="chat-body"></div>
-            <footer class="chat-footer">
-                <input type="text" id="openai-user-input" placeholder="Type your message...">
-                <button id="openai-send-btn">Send</button>
-                <button id="openai-clear-btn">Clear Chat</button>
-            </footer>
-        </div>
 
-        <!-- Cohere Chat -->
-        <div id="cohere-chat" class="chat-container">
-            <header class="chat-header">
-                <h2>Cohere Chat</h2>
-                <button id="close-cohere-chat" aria-label="Close">×</button>
-            </header>
-            <div id="cohere-chat-body" class="chat-body"></div>
-            <footer class="chat-footer">
-                <input type="text" id="cohere-user-input" placeholder="Type your message...">
-                <button id="cohere-send-btn">Send</button>
-                <button id="cohere-clear-btn">Clear Chat</button>
-            </footer>
-        </div>
-    </div>
+    <script src="script.js"></script>
 </body>
-<script src="script.js"></script>
 </html>
-
