@@ -4,3 +4,4 @@ openai
 cohere
 requests
 pytz
+os

@@ -5,6 +5,7 @@ import cohere
 from datetime import datetime
 import pytz
 import requests
+import os
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
@@ -13,20 +14,19 @@ CORS(app)  # Enable CORS for all routes
 app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024  # 5MB
 
 # OpenAI API Key
-OPENAI_API_KEY = "OPENAI_API_KEY"
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "your_default_openai_api_key")
 openai.api_key = OPENAI_API_KEY
 
 # Cohere API Key
-COHERE_API_KEY = "COHERE_API_KEY"
+COHERE_API_KEY = os.environ.get("COHERE_API_KEY", "your_default_cohere_api_key")
 co = cohere.Client(COHERE_API_KEY)
 
 # WeatherAPI Key
-WEATHER_API_KEY = "WEATHER_API_KEY"  # Replace with your WeatherAPI key
+WEATHER_API_KEY = os.environ.get("WEATHER_API_KEY", "your_default_weather_api_key")
 
 # Helper function: Get weather data
 def get_weather(city="London"):
     try:
-        # WeatherAPI endpoint
         url = f"http://api.weatherapi.com/v1/current.json?key={WEATHER_API_KEY}&q={city}"
         response = requests.get(url)
         if response.status_code == 200:
@@ -79,12 +79,10 @@ def serve_static_files(path):
 def openai_chat():
     data = request.json
     user_message = data.get("message", "")
-    user_ip = request.remote_addr  # Get user's IP address
+    user_ip = request.remote_addr
 
-    # Detect location
     city, country, timezone = get_user_location(user_ip)
 
-    # Handle specific requests
     if "time" in user_message.lower():
         if timezone:
             current_time = get_current_time(city, timezone)
@@ -99,7 +97,6 @@ def openai_chat():
         else:
             return jsonify({"reply": "I couldn't determine your location. Please provide your city for the weather information."})
 
-    # General OpenAI Chat
     try:
         response = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
@@ -120,12 +117,10 @@ def openai_chat():
 def cohere_chat():
     data = request.json
     user_message = data.get("message", "")
-    user_ip = request.remote_addr  # Get user's IP address
+    user_ip = request.remote_addr
 
-    # Detect location
     city, country, timezone = get_user_location(user_ip)
 
-    # Handle specific requests
     if "time" in user_message.lower():
         if timezone:
             current_time = get_current_time(city, timezone)
@@ -140,7 +135,6 @@ def cohere_chat():
         else:
             return jsonify({"reply": "I couldn't determine your location. Please provide your city for the weather information."})
 
-    # General Cohere Chat
     try:
         response = co.generate(
             model="command-xlarge-nightly",
@@ -154,4 +148,5 @@ def cohere_chat():
         return jsonify({"error": f"Internal Server Error: {str(e)}"}), 500
 
 if __name__ == "__main__":
-    app.run(debug=True, port=5000)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
