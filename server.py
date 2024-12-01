@@ -171,12 +171,11 @@ CORS(app)  # Enable CORS for all routes
 app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024  # 5MB
 
 # OpenAI API Key
-OPENAI_API_KEY = "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"
-
+OPENAI_API_KEY = "OPENAI_API_KEY"
 openai.api_key = OPENAI_API_KEY
 
 # Cohere API Key
-COHERE_API_KEY = "3be40PX2Rotm3hnR7eftzrLL7HDPRMb38buJ61TY"
+COHERE_API_KEY = "COHERE_API_KEY"
 co = cohere.Client(COHERE_API_KEY)
 
 # WeatherAPI Key
