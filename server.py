@@ -9,7 +9,7 @@ import os
 
 app = Flask(__name__)
 
-# Enable CORS for all routes with stricter policy
+# Enable CORS with stricter policy
 CORS(app, resources={r"/api/*": {"origins": ["https://ai-agents-1yi8.onrender.com"]}})
 
 # Set a maximum upload size (e.g., 5MB)
@@ -80,11 +80,8 @@ def serve_static_files(path):
         return make_response(f"File not found: {path}", 404)
 
 # OpenAI Chat Route
-@app.route("/api/openai-chat", methods=["POST", "GET"])
+@app.route("/api/openai-chat", methods=["POST"])
 def openai_chat():
-    if request.method == "GET":
-        return jsonify({"error": "GET requests are not supported for this endpoint."})
-
     data = request.json
     user_message = data.get("message", "")
     user_ip = request.remote_addr
@@ -121,11 +118,8 @@ def openai_chat():
         return jsonify({"error": f"Internal Server Error: {str(e)}"}), 500
 
 # Cohere Chat Route
-@app.route("/api/cohere-chat", methods=["POST", "GET"])
+@app.route("/api/cohere-chat", methods=["POST"])
 def cohere_chat():
-    if request.method == "GET":
-        return jsonify({"error": "GET requests are not supported for this endpoint."})
-
     data = request.json
     user_message = data.get("message", "")
     user_ip = request.remote_addr
