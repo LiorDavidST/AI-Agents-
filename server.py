@@ -93,20 +93,22 @@ def openai_chat():
             max_tokens=150,
             temperature=0.7
         )
-        reply = response.choices[0].message["content"].strip()
+        reply = response['choices'][0]['message']['content'].strip()
         return jsonify({"reply": reply})
-    except openai.error.AuthenticationError as e:
-        app.logger.error(f"OpenAI API authentication error: {str(e)}")
-        return jsonify({"error": "Authentication error. Check your OpenAI API key."}), 401
-    except openai.error.InvalidRequestError as e:
-        app.logger.error(f"OpenAI API request error: {str(e)}")
+
+    except openai.AuthenticationError as e:
+        app.logger.error(f"OpenAI Authentication error: {str(e)}")
+        return jsonify({"error": f"Authentication error: {str(e)}"}), 401
+    except openai.InvalidRequestError as e:
+        app.logger.error(f"OpenAI Invalid Request: {str(e)}")
         return jsonify({"error": f"Invalid request: {str(e)}"}), 400
-    except openai.error.OpenAIError as e:
+    except openai.OpenAIError as e:
         app.logger.error(f"OpenAI API error: {str(e)}")
         return jsonify({"error": f"OpenAI API error: {str(e)}"}), 500
     except Exception as e:
         app.logger.error(f"Internal Server Error: {str(e)}")
         return jsonify({"error": f"Internal Server Error: {str(e)}"}), 500
+
 
 @app.route("/api/cohere-chat", methods=["POST"])
 def cohere_chat():
