@@ -83,7 +83,7 @@ def openai_chat():
 
         user_message = data["message"]
 
-        # Updated call for OpenAI's API
+        # Call OpenAI's ChatCompletion API
         response = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
             messages=[
@@ -96,18 +96,19 @@ def openai_chat():
         reply = response['choices'][0]['message']['content'].strip()
         return jsonify({"reply": reply})
 
-    except openai.AuthenticationError as e:
-        app.logger.error(f"OpenAI Authentication error: {str(e)}")
+    except openai.AuthenticationError as e:  # Corrected exception path
+        app.logger.error(f"Authentication error: {str(e)}")
         return jsonify({"error": f"Authentication error: {str(e)}"}), 401
-    except openai.InvalidRequestError as e:
-        app.logger.error(f"OpenAI Invalid Request: {str(e)}")
+    except openai.InvalidRequestError as e:  # Corrected exception path
+        app.logger.error(f"Invalid request: {str(e)}")
         return jsonify({"error": f"Invalid request: {str(e)}"}), 400
-    except openai.OpenAIError as e:
+    except openai.OpenAIError as e:  # General OpenAI errors
         app.logger.error(f"OpenAI API error: {str(e)}")
         return jsonify({"error": f"OpenAI API error: {str(e)}"}), 500
     except Exception as e:
         app.logger.error(f"Internal Server Error: {str(e)}")
         return jsonify({"error": f"Internal Server Error: {str(e)}"}), 500
+
 
 
 @app.route("/api/cohere-chat", methods=["POST"])
