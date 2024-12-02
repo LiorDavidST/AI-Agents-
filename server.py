@@ -83,7 +83,7 @@ def openai_chat():
 
         user_message = data["message"]
 
-        # Updated call for OpenAI's API using `Completion` endpoint
+        # Updated call for OpenAI's API
         response = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
             messages=[
@@ -93,9 +93,15 @@ def openai_chat():
             max_tokens=150,
             temperature=0.7
         )
-        reply = response['choices'][0]['message']['content'].strip()
+        reply = response.choices[0].message["content"].strip()
         return jsonify({"reply": reply})
+    except openai.error.AuthenticationError as e:
+        app.logger.error(f"OpenAI API authentication error: {str(e)}")
+        return jsonify({"error": "Authentication error. Check your OpenAI API key."}), 401
     except openai.error.InvalidRequestError as e:
+        app.logger.error(f"OpenAI API request error: {str(e)}")
+        return jsonify({"error": f"Invalid request: {str(e)}"}), 400
+    except openai.error.OpenAIError as e:
         app.logger.error(f"OpenAI API error: {str(e)}")
         return jsonify({"error": f"OpenAI API error: {str(e)}"}), 500
     except Exception as e:
