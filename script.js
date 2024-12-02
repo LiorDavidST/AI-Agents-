@@ -13,8 +13,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const cohereClearBtn = document.getElementById("cohere-clear-btn");
 
     // Update the API endpoint URLs to match your Render deployment
-    const openaiEndpoint = "https://AI-Agents-.onrender.com/api/openai-chat"; // Replace 'AI-Agents-' with your Render app name
-    const cohereEndpoint = "https://AI-Agents-.onrender.com/api/cohere-chat"; // Replace 'AI-Agents-' with your Render app name
+    const openaiEndpoint = "https://ai-agents-1yi8.onrender.com/api/openai-chat"; // Replace 'AI-Agents-' with your Render app name
+    const cohereEndpoint = "https://ai-agents-1yi8.onrender.com/api/cohere-chat"; // Replace 'AI-Agents-' with your Render app name
 
     // Event listeners for send buttons
     openaiSendBtn.addEventListener("click", async () => {
