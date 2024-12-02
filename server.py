@@ -93,11 +93,8 @@ def openai_chat():
         )
         reply = response['choices'][0]['message']['content'].strip()
         return jsonify({"reply": reply})
-    except openai.error.OpenAIError as e:
-        app.logger.error(f"OpenAI API error: {str(e)}")
-        return jsonify({"error": f"OpenAI API error: {str(e)}"}), 500
     except Exception as e:
-        app.logger.error(f"Internal Server Error: {str(e)}")
+        app.logger.error(f"OpenAI API error: {str(e)}")
         return jsonify({"error": f"Internal Server Error: {str(e)}"}), 500
 
 @app.route("/api/cohere-chat", methods=["POST"])

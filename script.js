@@ -13,8 +13,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const cohereClearBtn = document.getElementById("cohere-clear-btn");
 
     // Update the API endpoint URLs to match your Render deployment
-    const openaiEndpoint = "https://ai-agents-1yi8.onrender.com/api/openai-chat"; // Replace 'AI-Agents-' with your Render app name
-    const cohereEndpoint = "https://ai-agents-1yi8.onrender.com/api/cohere-chat"; // Replace 'AI-Agents-' with your Render app name
+    const openaiEndpoint = "https://ai-agents-1yi8.onrender.com/api/openai-chat"; 
+    const cohereEndpoint = "https://ai-agents-1yi8.onrender.com/api/cohere-chat"; 
 
     // Event listeners for send buttons
     openaiSendBtn.addEventListener("click", async () => {
@@ -67,13 +67,15 @@ document.addEventListener("DOMContentLoaded", () => {
             });
 
             if (!response.ok) {
-                throw new Error(`Server error: ${response.status} ${response.statusText}`);
+                const errorText = await response.text();
+                throw new Error(`Server error: ${response.status} - ${errorText}`);
             }
 
             const data = await response.json();
             const botReply = data.reply || "⚠️ No response received.";
             addMessage(chatBody, "bot", botReply);
         } catch (error) {
+            console.error("Error:", error.message);
             addMessage(chatBody, "bot", `⚠️ Error: ${error.message}`);
         }
     }
