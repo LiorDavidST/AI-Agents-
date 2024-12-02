@@ -82,6 +82,8 @@ def openai_chat():
             return jsonify({"error": "Invalid request. 'message' field is required."}), 400
 
         user_message = data["message"]
+
+        # Updated call for OpenAI's API
         response = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
             messages=[
@@ -93,26 +95,9 @@ def openai_chat():
         )
         reply = response['choices'][0]['message']['content'].strip()
         return jsonify({"reply": reply})
-    except Exception as e:
+    except openai.error.OpenAIError as e:
         app.logger.error(f"OpenAI API error: {str(e)}")
-        return jsonify({"error": f"Internal Server Error: {str(e)}"}), 500
-
-@app.route("/api/cohere-chat", methods=["POST"])
-def cohere_chat():
-    try:
-        data = request.json
-        if not data or "message" not in data:
-            return jsonify({"error": "Invalid request. 'message' field is required."}), 400
-
-        user_message = data["message"]
-        response = co.generate(
-            model="command-xlarge-nightly",
-            prompt=f"User: {user_message}\nAssistant:",
-            max_tokens=150,
-            temperature=0.7
-        )
-        reply = response.generations[0].text.strip()
-        return jsonify({"reply": reply})
+        return jsonify({"error": f"OpenAI API error: {str(e)}"}), 500
     except Exception as e:
         app.logger.error(f"Internal Server Error: {str(e)}")
         return jsonify({"error": f"Internal Server Error: {str(e)}"}), 500
