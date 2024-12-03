@@ -5,3 +5,4 @@ cohere
 requests
 pytz
 pymongo 
+PyJWT 
