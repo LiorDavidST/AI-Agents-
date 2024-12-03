@@ -1,40 +1,38 @@
 document.addEventListener("DOMContentLoaded", () => {
-    // DOM elements for OpenAI and Cohere chats
-    const openaiChatBody = document.getElementById("openai-chat-body");
-    const cohereChatBody = document.getElementById("cohere-chat-body");
+    // Login and container elements
+    const loginForm = document.getElementById("login-form");
+    const chatsContainer = document.getElementById("chats-container");
+    const loginContainer = document.getElementById("login-container");
 
-    const openaiUserInput = document.getElementById("openai-user-input");
-    const cohereUserInput = document.getElementById("cohere-user-input");
+    // Hide OpenAI chat container
+    const openaiChat = document.getElementById("openai-chat");
+    if (openaiChat) {
+        openaiChat.style.display = "none";
+    }
 
-    const openaiSendBtn = document.getElementById("openai-send-btn");
-    const cohereSendBtn = document.getElementById("cohere-send-btn");
-
-    const openaiClearBtn = document.getElementById("openai-clear-btn");
-    const cohereClearBtn = document.getElementById("cohere-clear-btn");
-
-    // Update the API endpoint URLs to match your Render deployment
-    const openaiEndpoint = "https://ai-agents-1yi8.onrender.com/api/openai-chat"; 
-    const cohereEndpoint = "https://ai-agents-1yi8.onrender.com/api/cohere-chat"; 
-
-    // Event listeners for send buttons
-    openaiSendBtn.addEventListener("click", async () => {
-        await handleChat(openaiUserInput, openaiChatBody, openaiEndpoint);
+    // Login form submit handler
+    loginForm.addEventListener("submit", (e) => {
+        e.preventDefault();
+        // Simulate login success
+        loginContainer.classList.add("hidden");
+        chatsContainer.classList.remove("hidden");
     });
 
+    // Cohere chat elements
+    const cohereChatBody = document.getElementById("cohere-chat-body");
+    const cohereUserInput = document.getElementById("cohere-user-input");
+    const cohereSendBtn = document.getElementById("cohere-send-btn");
+    const cohereClearBtn = document.getElementById("cohere-clear-btn");
+
+    // Cohere API endpoint
+    const cohereEndpoint = "https://ai-agents-1yi8.onrender.com/api/cohere-chat";
+
+    // Event listeners for Cohere chat
     cohereSendBtn.addEventListener("click", async () => {
         await handleChat(cohereUserInput, cohereChatBody, cohereEndpoint);
     });
 
-    // Event listeners for clear buttons
-    openaiClearBtn.addEventListener("click", () => clearChat(openaiChatBody));
     cohereClearBtn.addEventListener("click", () => clearChat(cohereChatBody));
-
-    // Listen for Enter keypress in input fields to send messages
-    openaiUserInput.addEventListener("keypress", (event) => {
-        if (event.key === "Enter") {
-            openaiSendBtn.click();
-        }
-    });
 
     cohereUserInput.addEventListener("keypress", (event) => {
         if (event.key === "Enter") {

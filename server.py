@@ -1,6 +1,5 @@
 from flask import Flask, request, jsonify, send_from_directory, make_response
 from flask_cors import CORS
-import openai
 import cohere
 from datetime import datetime
 import pytz
@@ -16,8 +15,6 @@ CORS(app, resources={r"/api/*": {"origins": ["https://ai-agents-1yi8.onrender.co
 app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024  # 5MB
 
 # API Keys
-OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "your_default_openai_api_key")
-openai.api_key = OPENAI_API_KEY
 COHERE_API_KEY = os.environ.get("COHERE_API_KEY", "your_default_cohere_api_key")
 co = cohere.Client(COHERE_API_KEY)
 WEATHER_API_KEY = os.environ.get("WEATHER_API_KEY", "your_default_weather_api_key")
@@ -73,47 +70,6 @@ def serve_static_files(path):
     except Exception as e:
         app.logger.error(f"File not found: {path} - {str(e)}")
         return make_response(f"File not found: {path}", 404)
-
-@app.route("/api/openai-chat", methods=["POST"])
-def openai_chat():
-    try:
-        data = request.json
-        if not data or "message" not in data:
-            app.logger.error("Invalid request. 'message' field is required.")
-            return jsonify({"error": "Invalid request. 'message' field is required."}), 400
-
-        user_message = data["message"]
-
-        # Call OpenAI's ChatCompletion API
-        response = openai.Chat.create(
-            model="gpt-4",  # Ensure you're using the correct model version
-            messages=[
-                {"role": "system", "content": "You are a helpful assistant."},
-                {"role": "user", "content": user_message}
-            ],
-            max_tokens=150,
-            temperature=0.7
-        )
-
-        # Extract and return the AI's reply
-        reply = response['choices'][0]['message']['content'].strip()
-        return jsonify({"reply": reply})
-
-    except openai.error.AuthenticationError as e:
-        app.logger.error(f"Authentication error: {str(e)}")
-        return jsonify({"error": f"Authentication error: {str(e)}"}), 401
-    except openai.error.InvalidRequestError as e:
-        app.logger.error(f"Invalid request: {str(e)}")
-        return jsonify({"error": f"Invalid request: {str(e)}"}), 400
-    except openai.error.OpenAIError as e:
-        app.logger.error(f"OpenAI API error: {str(e)}")
-        return jsonify({"error": f"OpenAI API error: {str(e)}"}), 500
-    except Exception as e:
-        app.logger.error(f"Internal Server Error: {str(e)}")
-        return jsonify({"error": f"Internal Server Error: {str(e)}"}), 500
-
-
-
 
 @app.route("/api/cohere-chat", methods=["POST"])
 def cohere_chat():

@@ -3,43 +3,37 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-	 <link rel="icon" href="/static/favicon.ico" type="image/x-icon">
-    <title>Generative AI Chats</title>
+    <link rel="icon" href="/static/favicon.ico" type="image/x-icon">
+    <title>AI LAW SERVICE</title>
     <link rel="stylesheet" href="style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 </head>
 <body>
-    <!-- Chat Containers -->
-    <div id="chats-container">
-        <!-- OpenAI Chat -->
-        <div id="openai-chat" class="chat-container">
-            <header class="chat-header">
-                <h2>OpenAI Chat</h2>
-                <button id="close-openai-chat" aria-label="Close">
-                    <i class="fas fa-times"></i>
-                </button>
-            </header>
-            <div id="openai-chat-body" class="chat-body"></div>
-            <footer class="chat-footer">
-                <input type="text" id="openai-user-input" placeholder="Type your message..." aria-label="OpenAI message input">
-                <button id="openai-send-btn" aria-label="Send message">Send</button>
-                <button id="openai-clear-btn" aria-label="Clear chat">Clear Chat</button>
-            </footer>
-        </div>
+    <!-- Login Form -->
+    <div id="login-container">
+        <form id="login-form">
+            <h2>Login</h2>
+            <input type="email" id="email" placeholder="Email" required>
+            <input type="password" id="password" placeholder="Password" required>
+            <button type="submit">Login</button>
+        </form>
+    </div>
 
+    <!-- Chat Containers -->
+    <div id="chats-container" class="hidden">
         <!-- Cohere Chat -->
         <div id="cohere-chat" class="chat-container">
             <header class="chat-header">
-                <h2>Cohere Chat</h2>
+                <h2>AI LAW SERVICE</h2>
                 <button id="close-cohere-chat" aria-label="Close">
                     <i class="fas fa-times"></i>
                 </button>
             </header>
             <div id="cohere-chat-body" class="chat-body"></div>
             <footer class="chat-footer">
-                <input type="text" id="cohere-user-input" placeholder="Type your message..." aria-label="Cohere message input">
+                <input type="text" id="cohere-user-input" placeholder="Type your message..." aria-label="Message input">
                 <button id="cohere-send-btn" aria-label="Send message">Send</button>
                 <button id="cohere-clear-btn" aria-label="Clear chat">Clear Chat</button>
             </footer>
