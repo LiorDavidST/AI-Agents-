@@ -3,10 +3,11 @@ from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
 from pymongo import MongoClient
 import cohere
-from datetime import datetime
+from datetime import datetime, timedelta
 import pytz
 import requests
 import os
+import jwt
 
 app = Flask(__name__)
 
@@ -24,47 +25,25 @@ users_collection = db['users']
 
 # API Keys
 COHERE_API_KEY = os.environ.get("COHERE_API_KEY", "your_default_cohere_api_key")
+JWT_SECRET = os.environ.get("JWT_SECRET", "your_secret_key")
+JWT_EXPIRATION_MINUTES = int(os.environ.get("JWT_EXPIRATION_MINUTES", 30))
 co = cohere.Client(COHERE_API_KEY)
-WEATHER_API_KEY = os.environ.get("WEATHER_API_KEY", "your_default_weather_api_key")
 
 # Helper functions
-def get_weather(city="London"):
-    try:
-        url = f"http://api.weatherapi.com/v1/current.json?key={WEATHER_API_KEY}&q={city}"
-        response = requests.get(url)
-        if response.status_code == 200:
-            data = response.json()
-            temp = data["current"]["temp_c"]
-            description = data["current"]["condition"]["text"]
-            return f"The current weather in {city} is {temp}°C with {description}."
-        else:
-            return "Unable to fetch weather data at the moment. Please try again later."
-    except Exception as e:
-        app.logger.error(f"Weather API error: {str(e)}")
-        return f"Error fetching weather: {str(e)}"
+def generate_token(email):
+    """Generate a JWT token for the user."""
+    expiration = datetime.utcnow() + timedelta(minutes=JWT_EXPIRATION_MINUTES)
+    return jwt.encode({"email": email, "exp": expiration}, JWT_SECRET, algorithm="HS256")
 
-def get_user_location(ip_address=""):
+def decode_token(token):
+    """Decode a JWT token."""
     try:
-        url = f"https://ipinfo.io/{ip_address}?token=YOUR_IPINFO_API_KEY"
-        response = requests.get(url)
-        if response.status_code == 200:
-            data = response.json()
-            city = data.get("city", None)
-            country = data.get("country", None)
-            timezone = data.get("timezone", None)
-            return city, country, timezone
-        return None, None, None
-    except Exception as e:
-        app.logger.error(f"IP Info API error: {str(e)}")
-        return None, None, None
-
-def get_current_time(city=None, timezone=None):
-    try:
-        tz = pytz.timezone(timezone) if timezone else pytz.timezone("UTC")
-        return datetime.now(tz).strftime("%Y-%m-%d %H:%M:%S")
-    except Exception as e:
-        app.logger.error(f"Time error: {str(e)}")
-        return f"Error fetching time: {str(e)}"
+        payload = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
+        return payload["email"]
+    except jwt.ExpiredSignatureError:
+        return None
+    except jwt.InvalidTokenError:
+        return None
 
 # User Authentication Endpoints
 
@@ -105,13 +84,22 @@ def login():
 
     # Verify the password
     if check_password_hash(user["password_hash"], password):
-        return jsonify({"message": "Login successful"}), 200
+        token = generate_token(email)
+        return jsonify({"message": "Login successful", "token": token}), 200
     else:
         return jsonify({"error": "Invalid email or password"}), 401
 
-# Cohere Chat Endpoint
 @app.route("/api/cohere-chat", methods=["POST"])
 def cohere_chat():
+    token = request.headers.get("Authorization")
+    if not token:
+        return jsonify({"error": "Authorization token is missing"}), 401
+
+    token = token.replace("Bearer ", "")  # Remove 'Bearer' prefix if present
+    email = decode_token(token)
+    if not email:
+        return jsonify({"error": "Invalid or expired token"}), 401
+
     try:
         data = request.json
         if not data or "message" not in data:

@@ -12,27 +12,37 @@
 <body>
     <!-- Top Buttons -->
     <div id="top-right-buttons">
-        <button id="login-btn">Login</button>
-        <button id="sign-in-btn">Sign In</button>
+        <button id="login-btn" aria-label="Open Login Form">Login</button>
+        <button id="sign-in-btn" aria-label="Open Sign-In Form">Sign In</button>
     </div>
+
+    <!-- Feedback Message -->
+    <div id="feedback" class="hidden"></div>
+
+    <!-- Loading Spinner -->
+    <div id="loading-spinner" class="hidden"></div>
 
     <!-- Login Form -->
     <div id="login-container" class="hidden">
-        <form id="login-form">
+        <form id="login-form" aria-label="Login Form">
             <h2>Login</h2>
+            <label for="login-email">Email:</label>
             <input type="email" id="login-email" placeholder="Email" required>
-            <input type="password" id="login-password" placeholder="Password" minlength="8" required>
-            <button type="submit">Login</button>
+            <label for="login-password">Password:</label>
+            <input type="password" id="login-password" placeholder="Password (min. 8 characters)" minlength="8" required>
+            <button type="submit" aria-label="Login Button">Login</button>
         </form>
     </div>
 
     <!-- Sign In Form -->
     <div id="sign-in-container" class="hidden">
-        <form id="sign-in-form">
+        <form id="sign-in-form" aria-label="Sign-In Form">
             <h2>Sign In</h2>
+            <label for="sign-in-email">Email:</label>
             <input type="email" id="sign-in-email" placeholder="Email" required>
-            <input type="password" id="sign-in-password" placeholder="Password" minlength="8" required>
-            <button type="submit">Sign In</button>
+            <label for="sign-in-password">Password:</label>
+            <input type="password" id="sign-in-password" placeholder="Password (min. 8 characters)" minlength="8" required>
+            <button type="submit" aria-label="Sign-In Button">Sign In</button>
         </form>
     </div>
 
@@ -42,7 +52,9 @@
             <header class="chat-header">
                 <h2>AI LAW SERVICE</h2>
             </header>
-            <div id="cohere-chat-body" class="chat-body"></div>
+            <div id="cohere-chat-body" class="chat-body">
+                <p class="placeholder">Welcome to AI LAW SERVICE! Start typing to begin your conversation.</p>
+            </div>
             <footer class="chat-footer">
                 <textarea id="cohere-user-input" placeholder="Type your message..." aria-label="Message input"></textarea>
                 <button id="cohere-send-btn" aria-label="Send message">Send</button>
