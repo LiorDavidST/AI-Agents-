@@ -131,7 +131,6 @@ def cohere_chat():
         app.logger.error(f"Internal Server Error: {str(e)}")
         return jsonify({"error": f"Internal Server Error: {str(e)}"}), 500
 
-
 # Static File Serving
 @app.route("/", methods=["GET"])
 def serve_index():
