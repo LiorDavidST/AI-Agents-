@@ -93,30 +93,46 @@ def login():
 
 @app.route("/api/cohere-chat", methods=["POST"])
 def cohere_chat():
-    token = request.headers.get("Authorization")
-    app.logger.info(f"Authorization Header: {token}")  # Log the Authorization header
+    # Log all headers to help debug missing or malformed Authorization header
+    app.logger.info(f"Request Headers: {request.headers}")
 
+    # Log the Authorization header specifically
+    token = request.headers.get("Authorization")
+    app.logger.info(f"Authorization Header: {token}")
+
+    # Check if the Authorization header is missing
     if not token:
         app.logger.info("Missing Authorization Header")
         return jsonify({"error": "Authorization token is missing"}), 401
 
-    token = token.replace("Bearer ", "")  # Remove 'Bearer' prefix if present
-    email = decode_token(token)
-    app.logger.info(f"Decoded Email from Token: {email}")  # Log the decoded email
+    # Remove 'Bearer' prefix and log the raw token
+    token = token.replace("Bearer ", "")
+    app.logger.info(f"Raw Token: {token}")
 
+    # Decode the token and log the result
+    email = decode_token(token)
+    app.logger.info(f"Decoded Email from Token: {email}")
+
+    # If token is invalid or expired, log it and return an error
     if not email:
         app.logger.info("Invalid or Expired Token")
         return jsonify({"error": "Invalid or expired token"}), 401
 
     try:
+        # Log the request body
         data = request.json
+        app.logger.info(f"Request Body: {data}")
+
+        # Check if the 'message' field is present in the body
         if not data or "message" not in data:
-            app.logger.info("Invalid Request Body")
+            app.logger.info("Invalid Request Body - Missing 'message'")
             return jsonify({"error": "Invalid request. 'message' field is required."}), 400
 
+        # Log the user message
         user_message = data["message"]
-        app.logger.info(f"User Message: {user_message}")  # Log the user's message
+        app.logger.info(f"User Message: {user_message}")
 
+        # Call the AI model and log the response
         response = co.generate(
             model="command-xlarge-nightly",
             prompt=f"User: {user_message}\nAssistant:",
@@ -124,10 +140,11 @@ def cohere_chat():
             temperature=0.7
         )
         reply = response.generations[0].text.strip()
-        app.logger.info(f"AI Reply: {reply}")  # Log the AI's reply
+        app.logger.info(f"AI Reply: {reply}")
 
         return jsonify({"reply": reply})
     except Exception as e:
+        # Log the detailed error
         app.logger.error(f"Internal Server Error: {str(e)}")
         return jsonify({"error": f"Internal Server Error: {str(e)}"}), 500
 
