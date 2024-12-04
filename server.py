@@ -25,7 +25,7 @@ users_collection = db['users']
 
 # API Keys
 COHERE_API_KEY = os.environ.get("COHERE_API_KEY", "your_default_cohere_api_key")
-JWT_SECRET = os.environ.get("JWT_SECRET", "your_secret_key")
+JWT_SECRET = os.environ.get("JWT_SECRET", "JWT_secret_key")
 JWT_EXPIRATION_MINUTES = int(os.environ.get("JWT_EXPIRATION_MINUTES", 30))
 co = cohere.Client(COHERE_API_KEY)
 
@@ -61,7 +61,7 @@ def sign_in():
 
     # Check if the email is already registered
     if users_collection.find_one({"email": email}):
-        return jsonify({"error": "Email already registered"}), 400
+        return jsonify({"error": f"The email '{email}' is already registered. Please log in or use a different email."}), 400
 
     # Hash the password and save the user
     password_hash = generate_password_hash(password)
