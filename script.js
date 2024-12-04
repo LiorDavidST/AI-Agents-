@@ -25,11 +25,11 @@ document.addEventListener("DOMContentLoaded", () => {
     let logoutTimer; // Timer for session timeout
 
     // Show/Hide Login and Sign-In Forms
-    loginBtn.addEventListener("click", () => {
+    loginBtn?.addEventListener("click", () => {
         toggleVisibility(loginContainer);
     });
 
-    signInBtn.addEventListener("click", () => {
+    signInBtn?.addEventListener("click", () => {
         toggleVisibility(signInContainer);
     });
 
@@ -39,7 +39,6 @@ document.addEventListener("DOMContentLoaded", () => {
         const email = document.getElementById("sign-in-email").value;
         const password = document.getElementById("sign-in-password").value;
 
-        // Validate inputs
         if (!isValidEmail(email)) {
             showFeedback("Please enter a valid email address.", true);
             return;
@@ -65,7 +64,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 showFeedback("Sign-in successful! Please log in.", false);
                 signInContainer.classList.add("hidden");
             } else {
-                showFeedback(data.error, true);
+                showFeedback(data.error || "Email already exists.", true);
             }
         } catch (err) {
             console.error("Sign-in failed:", err);
@@ -82,7 +81,6 @@ document.addEventListener("DOMContentLoaded", () => {
         const email = document.getElementById("login-email").value;
         const password = document.getElementById("login-password").value;
 
-        // Validate inputs
         if (!isValidEmail(email)) {
             showFeedback("Please enter a valid email address.", true);
             return;
@@ -135,7 +133,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!message) return;
 
         const placeholder = document.querySelector(".placeholder");
-        if (placeholder) placeholder.remove(); // Remove the placeholder for the first message
+        if (placeholder) placeholder.remove();
 
         addMessage("user", message);
         cohereUserInput.value = "";
@@ -143,12 +141,12 @@ document.addEventListener("DOMContentLoaded", () => {
         showLoading(true);
 
         try {
-            const authToken = localStorage.getItem("authToken"); // Retrieve the token
+            const authToken = localStorage.getItem("authToken");
             const response = await fetch("/api/cohere-chat", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
-                    "Authorization": `Bearer ${authToken}`, // Send the token in the Authorization header
+                    "Authorization": `Bearer ${authToken}`,
                 },
                 body: JSON.stringify({ message }),
             });
@@ -167,7 +165,6 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 
-    // Helper Functions
     const addMessage = (sender, message) => {
         const messageDiv = document.createElement("div");
         messageDiv.classList.add("message", sender);
@@ -213,7 +210,7 @@ document.addEventListener("DOMContentLoaded", () => {
             isAuthenticated = false;
             localStorage.removeItem("authToken");
             showFeedback("Session expired. Please log in again.", true);
-            location.reload(); // Optionally reload the page
+            location.reload();
         }, 30 * 60 * 1000); // 30 minutes
     };
 
