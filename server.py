@@ -94,20 +94,29 @@ def login():
 @app.route("/api/cohere-chat", methods=["POST"])
 def cohere_chat():
     token = request.headers.get("Authorization")
+    app.logger.info(f"Authorization Header: {token}")  # Log the Authorization header
+
     if not token:
+        app.logger.info("Missing Authorization Header")
         return jsonify({"error": "Authorization token is missing"}), 401
 
     token = token.replace("Bearer ", "")  # Remove 'Bearer' prefix if present
     email = decode_token(token)
+    app.logger.info(f"Decoded Email from Token: {email}")  # Log the decoded email
+
     if not email:
+        app.logger.info("Invalid or Expired Token")
         return jsonify({"error": "Invalid or expired token"}), 401
 
     try:
         data = request.json
         if not data or "message" not in data:
+            app.logger.info("Invalid Request Body")
             return jsonify({"error": "Invalid request. 'message' field is required."}), 400
 
         user_message = data["message"]
+        app.logger.info(f"User Message: {user_message}")  # Log the user's message
+
         response = co.generate(
             model="command-xlarge-nightly",
             prompt=f"User: {user_message}\nAssistant:",
@@ -115,10 +124,13 @@ def cohere_chat():
             temperature=0.7
         )
         reply = response.generations[0].text.strip()
+        app.logger.info(f"AI Reply: {reply}")  # Log the AI's reply
+
         return jsonify({"reply": reply})
     except Exception as e:
         app.logger.error(f"Internal Server Error: {str(e)}")
         return jsonify({"error": f"Internal Server Error: {str(e)}"}), 500
+
 
 # Static File Serving
 @app.route("/", methods=["GET"])
