@@ -11,8 +11,11 @@ import jwt
 
 app = Flask(__name__)
 
-# Enable CORS with stricter policy
-CORS(app, resources={r"/api/*": {"origins": ["https://ai-agents-1yi8.onrender.com"]}})
+# Enable CORS with enhanced configuration
+CORS(app, resources={r"/api/*": {"origins": ["https://ai-agents-1yi8.onrender.com"]}},
+     supports_credentials=True,  # Allow credentials if needed
+     expose_headers=["Authorization"],  # Allow Authorization header in responses
+     allow_headers=["Authorization", "Content-Type"])  # Explicitly allow Authorization header
 
 # Set a maximum upload size (e.g., 5MB)
 app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024  # 5MB

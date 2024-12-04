@@ -143,14 +143,22 @@ document.addEventListener("DOMContentLoaded", () => {
         showLoading(true);
 
         try {
+            const authToken = localStorage.getItem("authToken"); // Retrieve the token
             const response = await fetch("/api/cohere-chat", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${authToken}`, // Send the token in the Authorization header
+                },
                 body: JSON.stringify({ message }),
             });
 
             const data = await response.json();
-            addMessage("bot", data.reply || "No response.");
+            if (response.ok) {
+                addMessage("bot", data.reply || "No response.");
+            } else {
+                addMessage("bot", data.error || "Error connecting to server.");
+            }
         } catch (err) {
             console.error("Chat error:", err);
             addMessage("bot", "Error connecting to server.");
@@ -160,8 +168,6 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     // Helper Functions
-
-    // Add a message to the chat body
     const addMessage = (sender, message) => {
         const messageDiv = document.createElement("div");
         messageDiv.classList.add("message", sender);
@@ -170,7 +176,6 @@ document.addEventListener("DOMContentLoaded", () => {
         cohereChatBody.scrollTop = cohereChatBody.scrollHeight;
     };
 
-    // Show feedback message
     const showFeedback = (message, isError = false) => {
         feedback.textContent = message;
         feedback.style.background = isError ? "var(--error-color)" : "var(--success-color)";
@@ -181,7 +186,6 @@ document.addEventListener("DOMContentLoaded", () => {
         }, 3000);
     };
 
-    // Show or hide the loading spinner
     const showLoading = (show) => {
         if (show) {
             loadingSpinner.classList.remove("hidden");
@@ -190,23 +194,19 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     };
 
-    // Toggle button state
     const toggleButtonState = (button, disable) => {
         button.disabled = disable;
     };
 
-    // Toggle visibility of an element
     const toggleVisibility = (element) => {
         element.classList.toggle("hidden");
     };
 
-    // Validate email format
     const isValidEmail = (email) => {
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         return emailRegex.test(email);
     };
 
-    // Reset logout timer
     const resetLogoutTimer = () => {
         clearTimeout(logoutTimer);
         logoutTimer = setTimeout(() => {
@@ -217,7 +217,6 @@ document.addEventListener("DOMContentLoaded", () => {
         }, 30 * 60 * 1000); // 30 minutes
     };
 
-    // Check authentication state on page load
     const authToken = localStorage.getItem("authToken");
     if (authToken) {
         isAuthenticated = true;
@@ -225,7 +224,6 @@ document.addEventListener("DOMContentLoaded", () => {
         resetLogoutTimer();
     }
 
-    // Reset logout timer on user activity
     document.addEventListener("mousemove", resetLogoutTimer);
     document.addEventListener("keydown", resetLogoutTimer);
 });
