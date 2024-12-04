@@ -1,81 +1,92 @@
 document.addEventListener("DOMContentLoaded", () => {
-    // Login and Sign-in Buttons
-    const loginBtn = document.getElementById("login-btn");
-    const signInBtn = document.getElementById("sign-in-btn");
-
-    // Containers
-    const loginContainer = document.getElementById("login-container");
-    const signInContainer = document.getElementById("sign-in-container");
-    const chatsContainer = document.getElementById("chats-container");
-
-    // Forms
-    const loginForm = document.getElementById("login-form");
+    // Elements
+    const signInLink = document.getElementById("sign-in-link");
+    const forgotPasswordLink = document.getElementById("forgot-password-link");
+    const signInPopup = document.getElementById("sign-in-popup");
+    const forgotPasswordPopup = document.getElementById("forgot-password-popup");
+    const closeButtons = document.querySelectorAll(".popup-close"); // Select all close buttons
     const signInForm = document.getElementById("sign-in-form");
-
-    // Chat Elements
+    const forgotPasswordForm = document.getElementById("forgot-password-form");
+    const loginForm = document.getElementById("login-form");
+    const feedback = document.getElementById("feedback");
+    const chatsContainer = document.getElementById("chats-container");
     const cohereChatBody = document.getElementById("cohere-chat-body");
     const cohereUserInput = document.getElementById("cohere-user-input");
     const cohereSendBtn = document.getElementById("cohere-send-btn");
 
-    // Feedback and Spinner Elements
-    const feedback = document.getElementById("feedback");
-    const loadingSpinner = document.getElementById("loading-spinner");
+    let isAuthenticated = false;
+    let logoutTimer;
 
-    let isAuthenticated = false; // Tracks authentication status
-    let logoutTimer; // Timer for session timeout
-
-    // Show/Hide Login and Sign-In Forms
-    loginBtn?.addEventListener("click", () => {
-        toggleVisibility(loginContainer);
+    // Close Popup
+    closeButtons.forEach((button) => {
+        button.addEventListener("click", () => {
+            const popup = button.closest(".popup"); // Find the parent popup
+            popup.classList.add("hidden"); // Hide the popup
+        });
     });
 
-    signInBtn?.addEventListener("click", () => {
-        toggleVisibility(signInContainer);
+    // Show Sign-In Popup
+    signInLink.addEventListener("click", (e) => {
+        e.preventDefault();
+        signInPopup.classList.remove("hidden");
     });
 
-    // Handle Sign-In
+    // Handle Sign-In Form Submission
     signInForm.addEventListener("submit", async (e) => {
         e.preventDefault();
         const email = document.getElementById("sign-in-email").value;
         const password = document.getElementById("sign-in-password").value;
 
-        if (!isValidEmail(email)) {
-            showFeedback("Please enter a valid email address.", true);
-            return;
-        }
-
-        if (password.length < 8) {
-            showFeedback("Password must be at least 8 characters long.", true);
-            return;
-        }
-
-        showLoading(true);
-        toggleButtonState(signInForm.querySelector("button"), true);
-
+        // Simulate sign-in logic
         try {
             const response = await fetch("/api/sign-in", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ email, password }),
             });
-
             const data = await response.json();
             if (response.ok) {
-                showFeedback("Sign-in successful! Please log in.", false);
-                signInContainer.classList.add("hidden");
+                showFeedback("Sign-up successful! Please log in.", false);
+                signInPopup.classList.add("hidden");
             } else {
-                showFeedback(data.error || "Email already exists.", true);
+                showFeedback(data.error || "Sign-up failed.", true);
             }
         } catch (err) {
-            console.error("Sign-in failed:", err);
-            showFeedback("Sign-in failed. Please try again.", true);
-        } finally {
-            showLoading(false);
-            toggleButtonState(signInForm.querySelector("button"), false);
+            showFeedback("An error occurred. Please try again.", true);
         }
     });
 
-    // Handle Login
+    // Show Forgot Password Popup
+    forgotPasswordLink.addEventListener("click", (e) => {
+        e.preventDefault();
+        forgotPasswordPopup.classList.remove("hidden");
+    });
+
+    // Handle Forgot Password Form Submission
+    forgotPasswordForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const email = document.getElementById("forgot-password-email").value;
+
+        // Simulate forgot password logic
+        try {
+            const response = await fetch("/api/forgot-password", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email }),
+            });
+            const data = await response.json();
+            if (response.ok) {
+                showFeedback("Password sent to your email.", false);
+                forgotPasswordPopup.classList.add("hidden");
+            } else {
+                showFeedback(data.error || "Error sending password.", true);
+            }
+        } catch (err) {
+            showFeedback("An error occurred. Please try again.", true);
+        }
+    });
+
+    // Handle Login Form Submission
     loginForm.addEventListener("submit", async (e) => {
         e.preventDefault();
         const email = document.getElementById("login-email").value;
@@ -91,9 +102,6 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
 
-        showLoading(true);
-        toggleButtonState(loginForm.querySelector("button"), true);
-
         try {
             const response = await fetch("/api/login", {
                 method: "POST",
@@ -103,22 +111,18 @@ document.addEventListener("DOMContentLoaded", () => {
 
             const data = await response.json();
             if (response.ok) {
-                const { token } = data; // Assuming the backend returns a token
+                const { token } = data;
                 localStorage.setItem("authToken", token);
                 isAuthenticated = true;
                 showFeedback("Login successful!", false);
-                loginContainer.classList.add("hidden");
                 chatsContainer.classList.remove("hidden");
+                loginForm.parentElement.classList.add("hidden");
                 resetLogoutTimer();
             } else {
-                showFeedback(data.error, true);
+                showFeedback(data.error || "Login failed.", true);
             }
         } catch (err) {
-            console.error("Login failed:", err);
             showFeedback("Login failed. Please try again.", true);
-        } finally {
-            showLoading(false);
-            toggleButtonState(loginForm.querySelector("button"), false);
         }
     });
 
@@ -138,8 +142,6 @@ document.addEventListener("DOMContentLoaded", () => {
         addMessage("user", message);
         cohereUserInput.value = "";
 
-        showLoading(true);
-
         try {
             const authToken = localStorage.getItem("authToken");
             const response = await fetch("/api/cohere-chat", {
@@ -158,13 +160,11 @@ document.addEventListener("DOMContentLoaded", () => {
                 addMessage("bot", data.error || "Error connecting to server.");
             }
         } catch (err) {
-            console.error("Chat error:", err);
             addMessage("bot", "Error connecting to server.");
-        } finally {
-            showLoading(false);
         }
     });
 
+    // Helper Functions
     const addMessage = (sender, message) => {
         const messageDiv = document.createElement("div");
         messageDiv.classList.add("message", sender);
@@ -183,22 +183,6 @@ document.addEventListener("DOMContentLoaded", () => {
         }, 3000);
     };
 
-    const showLoading = (show) => {
-        if (show) {
-            loadingSpinner.classList.remove("hidden");
-        } else {
-            loadingSpinner.classList.add("hidden");
-        }
-    };
-
-    const toggleButtonState = (button, disable) => {
-        button.disabled = disable;
-    };
-
-    const toggleVisibility = (element) => {
-        element.classList.toggle("hidden");
-    };
-
     const isValidEmail = (email) => {
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         return emailRegex.test(email);
@@ -211,16 +195,6 @@ document.addEventListener("DOMContentLoaded", () => {
             localStorage.removeItem("authToken");
             showFeedback("Session expired. Please log in again.", true);
             location.reload();
-        }, 30 * 60 * 1000); // 30 minutes
+        }, 30 * 60 * 1000);
     };
-
-    const authToken = localStorage.getItem("authToken");
-    if (authToken) {
-        isAuthenticated = true;
-        chatsContainer.classList.remove("hidden");
-        resetLogoutTimer();
-    }
-
-    document.addEventListener("mousemove", resetLogoutTimer);
-    document.addEventListener("keydown", resetLogoutTimer);
 });
