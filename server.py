@@ -49,37 +49,26 @@ def decode_token(token):
 
 # User Authentication Endpoints
 
-@app.route("/api/login", methods=["POST"])
-def login():
-    try:
-        data = request.json
-        if not data or "email" not in data or "password" not in data:
-            app.logger.error("Invalid input: Missing email or password")
-            return jsonify({"error": "Invalid input"}), 400
+@app.route("/api/sign-in", methods=["POST"])
+def sign_in():
+    data = request.json
+    if not data or "email" not in data or "password" not in data:
+        return jsonify({"error": "Invalid input"}), 400
 
-        email = data["email"]
-        password = data["password"]
-        app.logger.info(f"Login attempt with email: {email}")
+    email = data["email"]
+    password = data["password"]
 
-        # Find user by email
-        user = users_collection.find_one({"email": email})
-        if not user:
-            app.logger.warning(f"User not found: {email}")
-            return jsonify({"error": "Invalid email or password"}), 401
+    if len(password) < 8:
+        return jsonify({"error": "Password must be at least 8 characters"}), 400
 
-        # Verify the password
-        if check_password_hash(user["password_hash"], password):
-            app.logger.info(f"Password verified for user: {email}")
-            token = generate_token(email)
-            app.logger.info(f"Generated token: {token}")
-            return jsonify({"message": "Login successful", "token": token}), 200
-        else:
-            app.logger.warning(f"Password mismatch for user: {email}")
-            return jsonify({"error": "Invalid email or password"}), 401
-    except Exception as e:
-        app.logger.error(f"Error during login: {str(e)}")
-        return jsonify({"error": "Internal server error"}), 500
+    # Check if the email is already registered
+    if users_collection.find_one({"email": email}):
+        return jsonify({"error": f"The email '{email}' is already registered. Please log in or use a different email."}), 400
 
+    # Hash the password and save the user
+    password_hash = generate_password_hash(password)
+    users_collection.insert_one({"email": email, "password_hash": password_hash})
+    return jsonify({"message": "Sign-up successful"}), 201
 
 @app.route("/api/login", methods=["POST"])
 def login():
