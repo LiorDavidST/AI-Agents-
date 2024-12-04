@@ -41,8 +41,10 @@ def decode_token(token):
         payload = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
         return payload["email"]
     except jwt.ExpiredSignatureError:
+        app.logger.info("Token has expired.")
         return None
     except jwt.InvalidTokenError:
+        app.logger.info("Invalid token provided.")
         return None
 
 # User Authentication Endpoints
