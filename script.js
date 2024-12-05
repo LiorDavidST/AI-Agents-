@@ -13,25 +13,38 @@ document.addEventListener("DOMContentLoaded", () => {
     const cohereChatBody = document.getElementById("cohere-chat-body");
     const cohereUserInput = document.getElementById("cohere-user-input");
     const cohereSendBtn = document.getElementById("cohere-send-btn");
-    const fileInput = document.getElementById("file-input"); // Input for uploading files
+    const fileInput = document.getElementById("file-input");
     const radioCohereChat = document.getElementById("radio-cohere-chat");
     const radioContractCompliance = document.getElementById("radio-contract-compliance");
 
     let isAuthenticated = false;
     let logoutTimer;
 
+    // Helper to close all open popups
+    const closeAllPopups = () => {
+        signInPopup.classList.add("hidden");
+        forgotPasswordPopup.classList.add("hidden");
+    };
+
     // Close Popup
     closeButtons.forEach((button) => {
         button.addEventListener("click", () => {
-            const popup = button.closest(".popup");
-            popup.classList.add("hidden");
+            button.closest(".popup").classList.add("hidden");
         });
     });
 
     // Show Sign-In Popup
     signInLink.addEventListener("click", (e) => {
         e.preventDefault();
+        closeAllPopups(); // Close other popups
         signInPopup.classList.remove("hidden");
+    });
+
+    // Show Forgot Password Popup
+    forgotPasswordLink.addEventListener("click", (e) => {
+        e.preventDefault();
+        closeAllPopups(); // Close other popups
+        forgotPasswordPopup.classList.remove("hidden");
     });
 
     // Handle Sign-In Form Submission
@@ -56,12 +69,6 @@ document.addEventListener("DOMContentLoaded", () => {
         } catch (err) {
             showFeedback("An error occurred. Please try again.", true);
         }
-    });
-
-    // Show Forgot Password Popup
-    forgotPasswordLink.addEventListener("click", (e) => {
-        e.preventDefault();
-        forgotPasswordPopup.classList.remove("hidden");
     });
 
     // Handle Forgot Password Form Submission
@@ -105,6 +112,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 localStorage.setItem("authToken", token);
                 isAuthenticated = true;
                 showFeedback("Login successful!", false);
+                loginForm.reset(); // Clear email and password fields
                 chatsContainer.classList.remove("hidden");
                 loginForm.parentElement.classList.add("hidden");
                 resetLogoutTimer();
