@@ -4,7 +4,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const forgotPasswordLink = document.getElementById("forgot-password-link");
     const signInPopup = document.getElementById("sign-in-popup");
     const forgotPasswordPopup = document.getElementById("forgot-password-popup");
-    const closeButtons = document.querySelectorAll(".popup-close"); // Select all close buttons
+    const closeButtons = document.querySelectorAll(".popup-close");
     const signInForm = document.getElementById("sign-in-form");
     const forgotPasswordForm = document.getElementById("forgot-password-form");
     const loginForm = document.getElementById("login-form");
@@ -13,6 +13,9 @@ document.addEventListener("DOMContentLoaded", () => {
     const cohereChatBody = document.getElementById("cohere-chat-body");
     const cohereUserInput = document.getElementById("cohere-user-input");
     const cohereSendBtn = document.getElementById("cohere-send-btn");
+    const fileInput = document.getElementById("file-input"); // Input for uploading files
+    const radioCohereChat = document.getElementById("radio-cohere-chat");
+    const radioContractCompliance = document.getElementById("radio-contract-compliance");
 
     let isAuthenticated = false;
     let logoutTimer;
@@ -20,8 +23,8 @@ document.addEventListener("DOMContentLoaded", () => {
     // Close Popup
     closeButtons.forEach((button) => {
         button.addEventListener("click", () => {
-            const popup = button.closest(".popup"); // Find the parent popup
-            popup.classList.add("hidden"); // Hide the popup
+            const popup = button.closest(".popup");
+            popup.classList.add("hidden");
         });
     });
 
@@ -37,7 +40,6 @@ document.addEventListener("DOMContentLoaded", () => {
         const email = document.getElementById("sign-in-email").value;
         const password = document.getElementById("sign-in-password").value;
 
-        // Simulate sign-in logic
         try {
             const response = await fetch("/api/sign-in", {
                 method: "POST",
@@ -67,7 +69,6 @@ document.addEventListener("DOMContentLoaded", () => {
         e.preventDefault();
         const email = document.getElementById("forgot-password-email").value;
 
-        // Simulate forgot password logic
         try {
             const response = await fetch("/api/forgot-password", {
                 method: "POST",
@@ -92,23 +93,12 @@ document.addEventListener("DOMContentLoaded", () => {
         const email = document.getElementById("login-email").value;
         const password = document.getElementById("login-password").value;
 
-        if (!isValidEmail(email)) {
-            showFeedback("Please enter a valid email address.", true);
-            return;
-        }
-
-        if (password.length < 8) {
-            showFeedback("Password must be at least 8 characters long.", true);
-            return;
-        }
-
         try {
             const response = await fetch("/api/login", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ email, password }),
             });
-
             const data = await response.json();
             if (response.ok) {
                 const { token } = data;
@@ -126,41 +116,69 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 
-    // Handle Chat Messages
+    // Handle Chat or Contract Compliance
     cohereSendBtn.addEventListener("click", async () => {
         if (!isAuthenticated) {
-            showFeedback("You must log in to use the chat!", true);
+            showFeedback("You must log in to use the service!", true);
             return;
         }
 
-        const message = cohereUserInput.value.trim();
-        if (!message) return;
+        const authToken = localStorage.getItem("authToken");
 
-        const placeholder = document.querySelector(".placeholder");
-        if (placeholder) placeholder.remove();
+        if (radioCohereChat.checked) {
+            // Handle Cohere Chat
+            const message = cohereUserInput.value.trim();
+            if (!message) return;
 
-        addMessage("user", message);
-        cohereUserInput.value = "";
+            addMessage("user", message);
+            cohereUserInput.value = "";
 
-        try {
-            const authToken = localStorage.getItem("authToken");
-            const response = await fetch("/api/cohere-chat", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${authToken}`,
-                },
-                body: JSON.stringify({ message }),
-            });
-
-            const data = await response.json();
-            if (response.ok) {
-                addMessage("bot", data.reply || "No response.");
-            } else {
-                addMessage("bot", data.error || "Error connecting to server.");
+            try {
+                const response = await fetch("/api/cohere-chat", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Authorization": `Bearer ${authToken}`,
+                    },
+                    body: JSON.stringify({ message }),
+                });
+                const data = await response.json();
+                if (response.ok) {
+                    addMessage("bot", data.reply || "No response.");
+                } else {
+                    addMessage("bot", data.error || "Error connecting to server.");
+                }
+            } catch (err) {
+                addMessage("bot", "Error connecting to server.");
             }
-        } catch (err) {
-            addMessage("bot", "Error connecting to server.");
+        } else if (radioContractCompliance.checked) {
+            // Handle Contract Compliance
+            const file = fileInput.files[0];
+            if (!file) {
+                showFeedback("Please upload a file for analysis.", true);
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append("file", file);
+
+            try {
+                const response = await fetch("/api/contract-compliance", {
+                    method: "POST",
+                    headers: {
+                        "Authorization": `Bearer ${authToken}`,
+                    },
+                    body: formData,
+                });
+                const data = await response.json();
+                if (response.ok) {
+                    addMessage("bot", `Compliance Result: ${data.result.status}\nDetails: ${data.result.details}`);
+                } else {
+                    addMessage("bot", data.error || "Error connecting to server.");
+                }
+            } catch (err) {
+                addMessage("bot", "Error connecting to server.");
+            }
         }
     });
 
@@ -181,11 +199,6 @@ document.addEventListener("DOMContentLoaded", () => {
         setTimeout(() => {
             feedback.classList.add("hidden");
         }, 3000);
-    };
-
-    const isValidEmail = (email) => {
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        return emailRegex.test(email);
     };
 
     const resetLogoutTimer = () => {

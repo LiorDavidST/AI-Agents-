@@ -63,10 +63,21 @@
                 <h2>AI LAW SERVICE</h2>
             </header>
             <div id="cohere-chat-body" class="chat-body">
-                <p class="placeholder">Welcome to AI LAW SERVICE! Start typing to begin your conversation.</p>
+                <p class="placeholder">Welcome to AI LAW SERVICE! Select a service to begin your conversation.</p>
             </div>
             <footer class="chat-footer">
+                <div class="service-selection">
+                    <label>
+                        <input type="radio" id="radio-cohere-chat" name="service" checked>
+                        Cohere Chat
+                    </label>
+                    <label>
+                        <input type="radio" id="radio-contract-compliance" name="service">
+                        Contract Compliance
+                    </label>
+                </div>
                 <textarea id="cohere-user-input" placeholder="Type your message..." aria-label="Message input"></textarea>
+                <input type="file" id="file-input" class="hidden" aria-label="Upload file for Contract Compliance">
                 <button id="cohere-send-btn" aria-label="Send message">Send</button>
             </footer>
         </div>

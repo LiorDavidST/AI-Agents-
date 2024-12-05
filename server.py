@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify, send_from_directory, make_response
 from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
 from pymongo import MongoClient
+from werkzeug.utils import secure_filename
 import cohere
 from datetime import datetime, timedelta
 import pytz
@@ -19,12 +20,18 @@ CORS(app, resources={r"/api/*": {"origins": ["https://ai-agents-1yi8.onrender.co
 
 # Set a maximum upload size (e.g., 5MB)
 app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024  # 5MB
+UPLOAD_FOLDER = "uploads"
+app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
+
+# Ensure upload folder exists
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 # MongoDB Configuration
 MONGO_URI = os.environ.get("MONGO_URI", "mongodb://localhost:27017/")
 client = MongoClient(MONGO_URI)
 db = client['ai_service']
 users_collection = db['users']
+reference_documents_collection = db['reference_documents']
 
 # API Keys
 COHERE_API_KEY = os.environ.get("COHERE_API_KEY", "your_default_cohere_api_key")
@@ -64,11 +71,9 @@ def sign_in():
     if len(password) < 8:
         return jsonify({"error": "Password must be at least 8 characters"}), 400
 
-    # Check if the email is already registered
     if users_collection.find_one({"email": email}):
         return jsonify({"error": f"The email '{email}' is already registered. Please log in or use a different email."}), 400
 
-    # Hash the password and save the user
     password_hash = generate_password_hash(password)
     users_collection.insert_one({"email": email, "password_hash": password_hash})
     return jsonify({"message": "Sign-up successful"}), 201
@@ -82,12 +87,10 @@ def login():
     email = data["email"]
     password = data["password"]
 
-    # Find user by email
     user = users_collection.find_one({"email": email})
     if not user:
         return jsonify({"error": "Invalid email or password"}), 401
 
-    # Verify the password
     if check_password_hash(user["password_hash"], password):
         token = generate_token(email)
         return jsonify({"message": "Login successful", "token": token}), 200
@@ -96,46 +99,21 @@ def login():
 
 @app.route("/api/cohere-chat", methods=["POST"])
 def cohere_chat():
-    # Log all headers to help debug missing or malformed Authorization header
-    app.logger.info(f"Request Headers: {request.headers}")
-
-    # Log the Authorization header specifically
     token = request.headers.get("Authorization")
-    app.logger.info(f"Authorization Header: {token}")
-
-    # Check if the Authorization header is missing
     if not token:
-        app.logger.info("Missing Authorization Header")
         return jsonify({"error": "Authorization token is missing"}), 401
 
-    # Remove 'Bearer' prefix and log the raw token
     token = token.replace("Bearer ", "")
-    app.logger.info(f"Raw Token: {token}")
-
-    # Decode the token and log the result
     email = decode_token(token)
-    app.logger.info(f"Decoded Email from Token: {email}")
-
-    # If token is invalid or expired, log it and return an error
     if not email:
-        app.logger.info("Invalid or Expired Token")
         return jsonify({"error": "Invalid or expired token"}), 401
 
     try:
-        # Log the request body
         data = request.json
-        app.logger.info(f"Request Body: {data}")
-
-        # Check if the 'message' field is present in the body
         if not data or "message" not in data:
-            app.logger.info("Invalid Request Body - Missing 'message'")
             return jsonify({"error": "Invalid request. 'message' field is required."}), 400
 
-        # Log the user message
         user_message = data["message"]
-        app.logger.info(f"User Message: {user_message}")
-
-        # Call the AI model and log the response
         response = co.generate(
             model="command-xlarge-nightly",
             prompt=f"User: {user_message}\nAssistant:",
@@ -143,13 +121,36 @@ def cohere_chat():
             temperature=0.7
         )
         reply = response.generations[0].text.strip()
-        app.logger.info(f"AI Reply: {reply}")
-
         return jsonify({"reply": reply})
     except Exception as e:
-        # Log the detailed error
         app.logger.error(f"Internal Server Error: {str(e)}")
         return jsonify({"error": f"Internal Server Error: {str(e)}"}), 500
+
+@app.route("/api/contract-compliance", methods=["POST"])
+def contract_compliance():
+    token = request.headers.get("Authorization")
+    if not token:
+        return jsonify({"error": "Authorization token is missing"}), 401
+
+    token = token.replace("Bearer ", "")
+    email = decode_token(token)
+    if not email:
+        return jsonify({"error": "Invalid or expired token"}), 401
+
+    if "file" not in request.files:
+        return jsonify({"error": "File is required for compliance check"}), 400
+
+    file = request.files["file"]
+    if file.filename == "":
+        return jsonify({"error": "No file selected"}), 400
+
+    filename = secure_filename(file.filename)
+    file_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
+    file.save(file_path)
+
+    # Dummy compliance logic for now
+    compliance_result = {"status": "Compliant", "details": "File matches reference template."}
+    return jsonify({"result": compliance_result}), 200
 
 # Static File Serving
 @app.route("/", methods=["GET"])
