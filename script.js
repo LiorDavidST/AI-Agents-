@@ -40,6 +40,12 @@ document.addEventListener("DOMContentLoaded", () => {
         signInPopup.classList.remove("hidden");
     });
 
+   // Auto-expand the textarea as the user types
+   userInput.addEventListener("input", function () {
+        this.style.height = "auto"; // Reset the height
+        this.style.height = `${this.scrollHeight}px`; // Adjust to fit content
+});
+
     // Show Forgot Password Popup
     forgotPasswordLink.addEventListener("click", (e) => {
         e.preventDefault();
