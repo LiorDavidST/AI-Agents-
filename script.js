@@ -1,4 +1,5 @@
 document.addEventListener("DOMContentLoaded", () => {
+    // Elements
     const signInLink = document.getElementById("sign-in-link");
     const forgotPasswordLink = document.getElementById("forgot-password-link");
     const signInPopup = document.getElementById("sign-in-popup");
@@ -19,54 +20,111 @@ document.addEventListener("DOMContentLoaded", () => {
     let isAuthenticated = false;
     let logoutTimer;
 
+    // Helper to close all open popups
     const closeAllPopups = () => {
         signInPopup.classList.add("hidden");
         forgotPasswordPopup.classList.add("hidden");
     };
 
+    // Close Popup
     closeButtons.forEach((button) => {
         button.addEventListener("click", () => {
             button.closest(".popup").classList.add("hidden");
         });
     });
 
+    // Show Sign-In Popup
     signInLink.addEventListener("click", (e) => {
         e.preventDefault();
-        closeAllPopups();
+        closeAllPopups(); // Close other popups
         signInPopup.classList.remove("hidden");
     });
 
-    cohereUserInput.addEventListener("input", function () {
-        this.style.height = "auto";
-        this.style.height = `${this.scrollHeight}px`;
-    });
-
+    // Show Forgot Password Popup
     forgotPasswordLink.addEventListener("click", (e) => {
         e.preventDefault();
-        closeAllPopups();
+        closeAllPopups(); // Close other popups
         forgotPasswordPopup.classList.remove("hidden");
     });
 
+    // Handle Sign-In Form Submission
     signInForm.addEventListener("submit", async (e) => {
         e.preventDefault();
         const email = document.getElementById("sign-in-email").value;
         const password = document.getElementById("sign-in-password").value;
-        // המשך קוד...
+
+        try {
+            const response = await fetch("/api/sign-in", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email, password }),
+            });
+            const data = await response.json();
+            if (response.ok) {
+                showFeedback("Sign-up successful! Please log in.", false);
+                signInPopup.classList.add("hidden");
+            } else {
+                showFeedback(data.error || "Sign-up failed.", true);
+            }
+        } catch (err) {
+            showFeedback("An error occurred. Please try again.", true);
+        }
     });
 
+    // Handle Forgot Password Form Submission
     forgotPasswordForm.addEventListener("submit", async (e) => {
         e.preventDefault();
         const email = document.getElementById("forgot-password-email").value;
-        // המשך קוד...
+
+        try {
+            const response = await fetch("/api/forgot-password", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email }),
+            });
+            const data = await response.json();
+            if (response.ok) {
+                showFeedback("Password sent to your email.", false);
+                forgotPasswordPopup.classList.add("hidden");
+            } else {
+                showFeedback(data.error || "Error sending password.", true);
+            }
+        } catch (err) {
+            showFeedback("An error occurred. Please try again.", true);
+        }
     });
 
+    // Handle Login Form Submission
     loginForm.addEventListener("submit", async (e) => {
         e.preventDefault();
         const email = document.getElementById("login-email").value;
         const password = document.getElementById("login-password").value;
-        // המשך קוד...
+
+        try {
+            const response = await fetch("/api/login", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email, password }),
+            });
+            const data = await response.json();
+            if (response.ok) {
+                const { token } = data;
+                localStorage.setItem("authToken", token);
+                isAuthenticated = true;
+                showFeedback("Login successful!", false);
+                loginForm.reset(); // Clear email and password fields
+                chatsContainer.classList.remove("hidden");
+                loginForm.parentElement.classList.add("hidden");
+                resetLogoutTimer();
+            } else {
+                showFeedback(data.error || "Login failed.", true);
+            }
+        } catch (err) {
+            showFeedback("Login failed. Please try again.", true);
+        }
     });
 
+    // Handle Chat or Contract Compliance
     cohereSendBtn.addEventListener("click", async () => {
         if (!isAuthenticated) {
             showFeedback("You must log in to use the service!", true);
@@ -76,15 +134,12 @@ document.addEventListener("DOMContentLoaded", () => {
         const authToken = localStorage.getItem("authToken");
 
         if (radioCohereChat.checked) {
+            // Handle Cohere Chat
             const message = cohereUserInput.value.trim();
-            if (!message) {
-                showFeedback("Message cannot be empty!", true);
-                return;
-            }
+            if (!message) return;
 
             addMessage("user", message);
             cohereUserInput.value = "";
-            cohereUserInput.style.height = "auto";
 
             try {
                 const response = await fetch("/api/cohere-chat", {
@@ -102,11 +157,40 @@ document.addEventListener("DOMContentLoaded", () => {
                     addMessage("bot", data.error || "Error connecting to server.");
                 }
             } catch (err) {
-                addMessage("bot", "Error connecting to server. Please try again later.");
+                addMessage("bot", "Error connecting to server.");
+            }
+        } else if (radioContractCompliance.checked) {
+            // Handle Contract Compliance
+            const file = fileInput.files[0];
+            if (!file) {
+                showFeedback("Please upload a file for analysis.", true);
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append("file", file);
+
+            try {
+                const response = await fetch("/api/contract-compliance", {
+                    method: "POST",
+                    headers: {
+                        "Authorization": `Bearer ${authToken}`,
+                    },
+                    body: formData,
+                });
+                const data = await response.json();
+                if (response.ok) {
+                    addMessage("bot", `Compliance Result: ${data.result.status}\nDetails: ${data.result.details}`);
+                } else {
+                    addMessage("bot", data.error || "Error connecting to server.");
+                }
+            } catch (err) {
+                addMessage("bot", "Error connecting to server.");
             }
         }
     });
 
+    // Helper Functions
     const addMessage = (sender, message) => {
         const messageDiv = document.createElement("div");
         messageDiv.classList.add("message", sender);
