@@ -213,6 +213,7 @@ textarea {
     resize: none;
     font-size: 14px;
     box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);
+	hight: 400px;
 	}
 
 .chat-right button {

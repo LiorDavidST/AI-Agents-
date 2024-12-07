@@ -36,14 +36,14 @@ document.addEventListener("DOMContentLoaded", () => {
     // Show Sign-In Popup
     signInLink.addEventListener("click", (e) => {
         e.preventDefault();
-        closeAllPopups();
+        closeAllPopups(); // Close other popups
         signInPopup.classList.remove("hidden");
     });
 
     // Show Forgot Password Popup
     forgotPasswordLink.addEventListener("click", (e) => {
         e.preventDefault();
-        closeAllPopups();
+        closeAllPopups(); // Close other popups
         forgotPasswordPopup.classList.remove("hidden");
     });
 
@@ -112,7 +112,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 localStorage.setItem("authToken", token);
                 isAuthenticated = true;
                 showFeedback("Login successful!", false);
-                loginForm.reset();
+                loginForm.reset(); // Clear email and password fields
                 chatsContainer.classList.remove("hidden");
                 loginForm.parentElement.classList.add("hidden");
                 resetLogoutTimer();
@@ -124,19 +124,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 
-    // Add behavior for Contract Compliance
-    radioContractCompliance.addEventListener("change", () => {
-        addMessage("bot", "Please upload a contract or sales agreement.");
-        fileInput.classList.remove("hidden");
-    });
-
-    fileInput.addEventListener("change", () => {
-        addMessage(
-            "bot",
-            "Select one or more laws for compliance check:\n1. Sales Law 1973\n2. Sales Law Investment Assurance 1974"
-        );
-    });
-
+    // Handle Chat or Contract Compliance
     cohereSendBtn.addEventListener("click", async () => {
         if (!isAuthenticated) {
             showFeedback("You must log in to use the service!", true);
@@ -144,7 +132,34 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         const authToken = localStorage.getItem("authToken");
-        if (radioContractCompliance.checked) {
+
+        if (radioCohereChat.checked) {
+            // Handle Cohere Chat
+            const message = cohereUserInput.value.trim();
+            if (!message) return;
+
+            addMessage("user", message);
+            cohereUserInput.value = "";
+
+            try {
+                const response = await fetch("/api/cohere-chat", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Authorization": `Bearer ${authToken}`,
+                    },
+                    body: JSON.stringify({ message }),
+                });
+                const data = await response.json();
+                if (response.ok) {
+                    addMessage("bot", data.reply || "No response.");
+                } else {
+                    addMessage("bot", data.error || "Error connecting to server.");
+                }
+            } catch (err) {
+                addMessage("bot", "Error connecting to server.");
+            }
+        } else if (radioContractCompliance.checked) {
             // Handle Contract Compliance
             const file = fileInput.files[0];
             if (!file) {
@@ -152,33 +167,25 @@ document.addEventListener("DOMContentLoaded", () => {
                 return;
             }
 
-            const selectedLaws = [];
-            if (document.getElementById("law-1").checked) selectedLaws.push(1);
-            if (document.getElementById("law-2").checked) selectedLaws.push(2);
-
-            if (selectedLaws.length === 0) {
-                addMessage("bot", "Please select at least one law for compliance check.");
-                return;
-            }
-
             const formData = new FormData();
             formData.append("file", file);
-            formData.append("laws", JSON.stringify(selectedLaws));
 
             try {
                 const response = await fetch("/api/contract-compliance", {
                     method: "POST",
-                    headers: { Authorization: `Bearer ${authToken}` },
+                    headers: {
+                        "Authorization": `Bearer ${authToken}`,
+                    },
                     body: formData,
                 });
                 const data = await response.json();
                 if (response.ok) {
-                    addMessage("bot", `Compliance Result:\n${data.results.map(r => `${r.law}: ${r.status}`).join("\n")}`);
+                    addMessage("bot", `Compliance Result: ${data.result.status}\nDetails: ${data.result.details}`);
                 } else {
-                    addMessage("bot", `Error: ${data.error}`);
+                    addMessage("bot", data.error || "Error connecting to server.");
                 }
-            } catch (error) {
-                addMessage("bot", "Error while checking contract compliance.");
+            } catch (err) {
+                addMessage("bot", "Error connecting to server.");
             }
         }
     });
