@@ -50,8 +50,10 @@ def load_laws():
     try:
         for filename in os.listdir(LAWS_FOLDER):
             if filename.endswith(".txt"):
+                # Normalize the filename for matching
+                law_id = os.path.splitext(filename)[0].strip()
                 with open(os.path.join(LAWS_FOLDER, filename), "r", encoding="utf-8") as f:
-                    laws[filename.replace(".txt", "")] = f.read()
+                    laws[law_id] = f.read()
     except Exception as e:
         app.logger.error(f"Error loading laws: {str(e)}")
     return laws
@@ -97,6 +99,7 @@ def login():
 @app.route("/api/contract-compliance", methods=["POST"])
 def contract_compliance():
     try:
+        # Validate Authorization token
         token = request.headers.get("Authorization")
         if not token:
             return jsonify({"error": "Authorization token is missing"}), 401
@@ -106,17 +109,20 @@ def contract_compliance():
         if not email:
             return jsonify({"error": "Invalid or expired token"}), 401
 
+        # Validate file and selected laws
         if "file" not in request.files or not request.form.getlist("selected_laws"):
             return jsonify({"error": "File and selected laws are required"}), 400
 
         file = request.files["file"]
-        if not file.filename:
+        if file.filename == "":
             return jsonify({"error": "No file selected"}), 400
 
+        # Save uploaded file
         filename = secure_filename(file.filename)
         file_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
         file.save(file_path)
 
+        # Read and decode uploaded file content
         try:
             with open(file_path, "rb") as f:
                 file_content = f.read()
@@ -128,6 +134,7 @@ def contract_compliance():
             app.logger.error(f"Failed to read file: {str(e)}")
             return jsonify({"error": f"Failed to read the uploaded file: {str(e)}"}), 500
 
+        # Process laws and compliance check
         selected_laws = request.form.getlist("selected_laws")
         laws = load_laws()
         compliance_results = []
@@ -136,6 +143,7 @@ def contract_compliance():
             if law_id in laws:
                 law_text = laws[law_id]
                 try:
+                    # Perform compliance check using Cohere
                     response = co.compare(inputs=[user_content, law_text])
                     similarity = response.similarity
                     compliance_results.append({
@@ -162,6 +170,7 @@ def contract_compliance():
     except Exception as e:
         app.logger.error(f"Unexpected error in contract_compliance: {str(e)}")
         return jsonify({"error": "Internal server error", "details": str(e)}), 500
+
 
 # Static File Serving
 @app.route("/", methods=["GET"])
