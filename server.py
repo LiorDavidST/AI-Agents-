@@ -52,8 +52,8 @@ def load_laws():
             if filename.endswith(".txt"):
                 # Normalize the filename for matching
                 law_id = os.path.splitext(filename)[0].strip()
-                with open(os.path.join(LAWS_FOLDER, filename), "r", encoding="utf-8") as f:
-                    laws[law_id] = f.read()
+                laws[law_id] = open(os.path.join(LAWS_FOLDER, filename), "r", encoding="utf-8").read()
+        app.logger.info(f"Loaded laws: {list(laws.keys())}")
     except Exception as e:
         app.logger.error(f"Error loading laws: {str(e)}")
     return laws
