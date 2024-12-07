@@ -16,7 +16,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const fileInput = document.getElementById("file-input");
     const radioCohereChat = document.getElementById("radio-cohere-chat");
     const radioContractCompliance = document.getElementById("radio-contract-compliance");
-    const lawSelectionContainer = document.createElement("div"); // For law checkboxes
+    const lawSelectionContainer = document.createElement("div");
 
     let isAuthenticated = false;
     let logoutTimer;
@@ -188,13 +188,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
             const formData = new FormData();
             formData.append("file", file);
-            formData.append("selected_laws", selectedLaws);
+            selectedLaws.forEach((law) => formData.append("selected_laws", law));
 
             try {
                 const response = await fetch("/api/contract-compliance", {
                     method: "POST",
                     headers: {
-                        "Authorization": `Bearer ${authToken}`,
+                        Authorization: `Bearer ${authToken}`,
                     },
                     body: formData,
                 });
@@ -204,7 +204,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     data.result.forEach((res) => {
                         addMessage(
                             "bot",
-                            `Law: ${laws[res.law_id]} - Status: ${res.status} - ${res.details}`
+                            `Law: ${laws[res.law_id]} - Status: ${res.status} - ${res.details || ""}`
                         );
                     });
                 } else {

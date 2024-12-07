@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify, send_from_directory, make_response
 from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
+from pymongo import MongoClient
 from werkzeug.utils import secure_filename
 import cohere
 from datetime import datetime, timedelta
@@ -17,6 +18,12 @@ UPLOAD_FOLDER = "uploads"
 LAWS_FOLDER = "HookeyMecher"
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+# MongoDB Configuration
+MONGO_URI = os.environ.get("MONGO_URI", "mongodb://localhost:27017/")
+client = MongoClient(MONGO_URI)
+db = client["ai_service"]
+users_collection = db["users"]
 
 COHERE_API_KEY = os.environ.get("COHERE_API_KEY", "your_default_cohere_api_key")
 JWT_SECRET = os.environ.get("JWT_SECRET", "JWT_secret_key")
@@ -37,18 +44,43 @@ def decode_token(token):
     except jwt.InvalidTokenError:
         return None
 
-def load_laws():
-    """Load laws from the HookeyMecher directory."""
-    laws = {}
-    try:
-        for filename in os.listdir(LAWS_FOLDER):
-            if filename.endswith(".txt"):
-                with open(os.path.join(LAWS_FOLDER, filename), "r", encoding="utf-8") as f:
-                    law_id = filename.replace(".txt", "")
-                    laws[law_id] = f.read()
-    except Exception as e:
-        app.logger.error(f"Error loading laws: {str(e)}")
-    return laws
+@app.route("/api/sign-in", methods=["POST"])
+def sign_in():
+    data = request.json
+    if not data or "email" not in data or "password" not in data:
+        return jsonify({"error": "Invalid input"}), 400
+
+    email = data["email"]
+    password = data["password"]
+
+    if len(password) < 8:
+        return jsonify({"error": "Password must be at least 8 characters"}), 400
+
+    if users_collection.find_one({"email": email}):
+        return jsonify({"error": f"The email '{email}' is already registered. Please log in or use a different email."}), 400
+
+    password_hash = generate_password_hash(password)
+    users_collection.insert_one({"email": email, "password_hash": password_hash})
+    return jsonify({"message": "Sign-up successful"}), 201
+
+@app.route("/api/login", methods=["POST"])
+def login():
+    data = request.json
+    if not data or "email" not in data or "password" not in data:
+        return jsonify({"error": "Invalid input"}), 400
+
+    email = data["email"]
+    password = data["password"]
+
+    user = users_collection.find_one({"email": email})
+    if not user:
+        return jsonify({"error": "Invalid email or password"}), 401
+
+    if check_password_hash(user["password_hash"], password):
+        token = generate_token(email)
+        return jsonify({"message": "Login successful", "token": token}), 200
+    else:
+        return jsonify({"error": "Invalid email or password"}), 401
 
 @app.route("/api/contract-compliance", methods=["POST"])
 def contract_compliance():
