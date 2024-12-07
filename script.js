@@ -23,10 +23,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Predefined laws
     const laws = {
-        "1": "Sales Law 1973",
-        "2": "Investment Assurance 1974",
-        "3": "Investment Assurance Amendment 9",
-        "4": "Sales Regulations 1975",
+        "1": "חוק מכר דירות  1973",
+        "2": "חוק מכר דירות הבטחת השקעה 1974",
+        "3": "חוק מכר דירות הבטחת השקעה תיקון מספר 9",
+        "4": "תקנות המכר (דירות) (הבטחת השקעות של רוכשי דירות) (סייג לתשלומים על חשבון מחיר דירה), -1975",
     };
 
     // Helper to close all open popups
