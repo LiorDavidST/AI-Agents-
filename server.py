@@ -1,17 +1,15 @@
 from flask import Flask, request, jsonify, send_from_directory, make_response
 from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
-from pymongo import MongoClient
 from werkzeug.utils import secure_filename
 import cohere
 from datetime import datetime, timedelta
-import pytz
 import os
 import jwt
 
 app = Flask(__name__)
 
-# Enable CORS with enhanced configuration
+# Enable CORS
 CORS(app, resources={r"/api/*": {"origins": ["https://ai-agents-1yi8.onrender.com"]}})
 
 # Configuration
@@ -25,7 +23,7 @@ JWT_SECRET = os.environ.get("JWT_SECRET", "JWT_secret_key")
 JWT_EXPIRATION_MINUTES = int(os.environ.get("JWT_EXPIRATION_MINUTES", 30))
 co = cohere.Client(COHERE_API_KEY)
 
-# Helper functions
+# Helper Functions
 def generate_token(email):
     expiration = datetime.utcnow() + timedelta(minutes=JWT_EXPIRATION_MINUTES)
     return jwt.encode({"email": email, "exp": expiration}, JWT_SECRET, algorithm="HS256")
@@ -46,7 +44,8 @@ def load_laws():
         for filename in os.listdir(LAWS_FOLDER):
             if filename.endswith(".txt"):
                 with open(os.path.join(LAWS_FOLDER, filename), "r", encoding="utf-8") as f:
-                    laws[filename] = f.read()
+                    law_id = filename.replace(".txt", "")
+                    laws[law_id] = f.read()
     except Exception as e:
         app.logger.error(f"Error loading laws: {str(e)}")
     return laws
@@ -70,6 +69,7 @@ def contract_compliance():
     if not file.filename or not selected_laws:
         return jsonify({"error": "File and selected laws must be provided"}), 400
 
+    # Save uploaded file
     filename = secure_filename(file.filename)
     file_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
     file.save(file_path)
@@ -84,19 +84,38 @@ def contract_compliance():
     # Load laws
     laws = load_laws()
     compliance_results = []
-    for law in selected_laws:
-        law_name = law + ".txt"
-        if law_name in laws:
-            law_text = laws[law_name]
-            response = co.compare(inputs=[user_content, law_text])
-            similarity = response.similarity
-            compliance_results.append({
-                "law": law_name,
-                "similarity": similarity,
-                "status": "Compliant" if similarity > 0.8 else "Non-Compliant"
-            })
+
+    # Compare uploaded file with selected laws
+    for law_id in selected_laws:
+        if law_id in laws:
+            law_text = laws[law_id]
+            try:
+                # Use Cohere to compare the user's contract with the law
+                response = co.classify(
+                    inputs=[user_content],
+                    examples=[
+                        {"text": law_text, "label": "Compliant"}
+                    ]
+                )
+                similarity = response.classifications[0].confidence
+                compliance_results.append({
+                    "law_id": law_id,
+                    "law_name": laws[law_id],
+                    "similarity": similarity,
+                    "status": "Compliant" if similarity > 0.8 else "Non-Compliant"
+                })
+            except Exception as e:
+                compliance_results.append({
+                    "law_id": law_id,
+                    "status": "Error",
+                    "error": f"Failed to compare with law: {str(e)}"
+                })
         else:
-            compliance_results.append({"law": law_name, "status": "Not Found"})
+            compliance_results.append({
+                "law_id": law_id,
+                "status": "Not Found",
+                "error": "The selected law is not available in the system."
+            })
 
     return jsonify({"result": compliance_results}), 200
 
