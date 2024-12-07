@@ -11,7 +11,7 @@ import jwt
 app = Flask(__name__)
 
 # Enable CORS
-CORS(app, resources={r"/api/*": {"origins": ["https://ai-agents-1yi8.onrender.com"]}})
+CORS(app, resources={r"/api/*": {"origins": "*"}}, supports_credentials=True)
 
 # Configuration
 UPLOAD_FOLDER = "uploads"
@@ -84,34 +84,46 @@ def login():
 
 @app.route("/api/contract-compliance", methods=["POST"])
 def contract_compliance():
-    token = request.headers.get("Authorization")
-    if not token:
-        return jsonify({"error": "Authorization token is missing"}), 401
-
-    token = token.replace("Bearer ", "")
-    email = decode_token(token)
-    if not email:
-        return jsonify({"error": "Invalid or expired token"}), 401
-
-    if "file" not in request.files or not request.form.getlist("selected_laws"):
-        return jsonify({"error": "File and selected laws are required"}), 400
-
-    file = request.files["file"]
-    selected_laws = request.form.getlist("selected_laws")
-    if not file.filename or not selected_laws:
-        return jsonify({"error": "File and selected laws must be provided"}), 400
-
-    # Save uploaded file
-    filename = secure_filename(file.filename)
-    file_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
-    file.save(file_path)
-
-    # Read uploaded file content
     try:
-        with open(file_path, "r", encoding="utf-8") as f:
-            user_content = f.read()
+        token = request.headers.get("Authorization")
+        if not token:
+            return jsonify({"error": "Authorization token is missing"}), 401
+
+        token = token.replace("Bearer ", "")
+        email = decode_token(token)
+        if not email:
+            return jsonify({"error": "Invalid or expired token"}), 401
+
+        if "file" not in request.files or not request.form.getlist("selected_laws"):
+            return jsonify({"error": "File and selected laws are required"}), 400
+
+        file = request.files["file"]
+        if file.filename == "":
+            return jsonify({"error": "No file selected"}), 400
+
+        filename = secure_filename(file.filename)
+        file_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
+        file.save(file_path)
+
+        # Read uploaded file content
+        try:
+            with open(file_path, "rb") as f:
+                file_content = f.read()
+            try:
+                user_content = file_content.decode("utf-8")
+            except UnicodeDecodeError:
+                user_content = file_content.decode("iso-8859-1")
+        except Exception as e:
+            app.logger.error(f"Failed to read file: {str(e)}")
+            return jsonify({"error": f"Failed to read the uploaded file: {str(e)}"}), 500
+
+        # Placeholder: Compliance logic here
+        return jsonify({"result": "Placeholder for compliance result"}), 200
+
     except Exception as e:
-        return jsonify({"error": f"Failed to read the uploaded file: {str(e)}"}), 500
+        app.logger.error(f"Unexpected error in contract-compliance: {str(e)}")
+        return jsonify({"error": "An unexpected error occurred on the server"}), 500
+
 
     # Load laws
     laws = load_laws()

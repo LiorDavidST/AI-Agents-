@@ -177,42 +177,46 @@ document.addEventListener("DOMContentLoaded", () => {
                 return;
             }
 
-            const selectedLaws = Array.from(
-                lawSelectionContainer.querySelectorAll("input[type=checkbox]:checked")
-            ).map((checkbox) => checkbox.value);
+const selectedLaws = Array.from(
+    lawSelectionContainer.querySelectorAll("input[type=checkbox]:checked")
+).map((checkbox) => checkbox.value);
 
-            if (selectedLaws.length === 0) {
-                showFeedback("Please select at least one law for analysis.", true);
-                return;
-            }
+if (!selectedLaws.length) {
+    showFeedback("Please select at least one law for analysis.", true);
+    return;
+}
 
-            const formData = new FormData();
-            formData.append("file", file);
-            selectedLaws.forEach((law) => formData.append("selected_laws", law));
+if (!fileInput.files[0]) {
+    showFeedback("Please upload a file for analysis.", true);
+    return;
+}
 
-            try {
-                const response = await fetch("/api/contract-compliance", {
-                    method: "POST",
-                    headers: {
-                        Authorization: `Bearer ${authToken}`,
-                    },
-                    body: formData,
-                });
+const formData = new FormData();
+formData.append("file", fileInput.files[0]);
+selectedLaws.forEach((law) => formData.append("selected_laws", law));
 
-                const data = await response.json();
-                if (response.ok) {
-                    data.result.forEach((res) => {
-                        addMessage(
-                            "bot",
-                            `Law: ${laws[res.law_id]} - Status: ${res.status} - ${res.details || ""}`
-                        );
-                    });
-                } else {
-                    addMessage("bot", data.error || "Error connecting to server.");
-                }
-            } catch (err) {
-                addMessage("bot", "Error connecting to server.");
-            }
+
+try {
+    const response = await fetch("/api/contract-compliance", {
+        method: "POST",
+        headers: {
+            Authorization: `Bearer ${authToken}`,
+        },
+        body: formData,
+    });
+
+    const data = await response.json();
+    if (response.ok) {
+        data.result.forEach((res) => {
+            addMessage("bot", `Law: ${laws[res.law_id]} - Status: ${res.status} - ${res.details}`);
+        });
+    } else {
+        addMessage("bot", `Error: ${data.error || "Server returned an error"}`);
+    }
+} catch (err) {
+    addMessage("bot", `Error connecting to server: ${err.message}`);
+}
+
         }
     });
 
