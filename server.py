@@ -5,7 +5,6 @@ from pymongo import MongoClient
 from werkzeug.utils import secure_filename
 import cohere
 from datetime import datetime, timedelta
-import pytz
 import requests
 import os
 import jwt
@@ -73,7 +72,7 @@ def contract_compliance():
     if not email:
         return jsonify({"error": "Invalid or expired token"}), 401
 
-    if "file" not in request.files or not request.form.get("selected_laws"):
+    if "file" not in request.files or not request.form.getlist("selected_laws"):
         return jsonify({"error": "File and selected laws are required"}), 400
 
     file = request.files["file"]
