@@ -206,18 +206,27 @@ try {
     });
 
     const data = await response.json();
+    console.log("Server Response:", data); // Add this to debug the response
     if (response.ok) {
-        data.result.forEach((res) => {
-            addMessage("bot", `Law: ${laws[res.law_id]} - Status: ${res.status} - ${res.details}`);
-        });
+        // Process response
+        if (Array.isArray(data.result)) {
+            data.result.forEach((res) => {
+                addMessage(
+                    "bot",
+                    `Law: ${laws[res.law_id]} - Status: ${res.status} - ${res.details || "No details"}`
+                );
+            });
+        } else {
+            // Handle non-array result
+            addMessage("bot", `Unexpected response format: ${JSON.stringify(data.result)}`);
+        }
     } else {
-        addMessage("bot", `Error: ${data.error || "Server returned an error"}`);
+        addMessage("bot", data.error || "Error connecting to server.");
     }
 } catch (err) {
-    addMessage("bot", `Error connecting to server: ${err.message}`);
+    addMessage("bot", "Error connecting to server.");
 }
 
-        }
     });
 
     const addMessage = (sender, message) => {

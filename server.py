@@ -85,6 +85,7 @@ def login():
 @app.route("/api/contract-compliance", methods=["POST"])
 def contract_compliance():
     try:
+        # Validate Authorization token
         token = request.headers.get("Authorization")
         if not token:
             return jsonify({"error": "Authorization token is missing"}), 401
@@ -94,6 +95,7 @@ def contract_compliance():
         if not email:
             return jsonify({"error": "Invalid or expired token"}), 401
 
+        # Validate file and selected laws
         if "file" not in request.files or not request.form.getlist("selected_laws"):
             return jsonify({"error": "File and selected laws are required"}), 400
 
@@ -101,14 +103,16 @@ def contract_compliance():
         if file.filename == "":
             return jsonify({"error": "No file selected"}), 400
 
+        # Save uploaded file
         filename = secure_filename(file.filename)
         file_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
         file.save(file_path)
 
-        # Read uploaded file content
+        # Read and decode uploaded file content
         try:
             with open(file_path, "rb") as f:
                 file_content = f.read()
+
             try:
                 user_content = file_content.decode("utf-8")
             except UnicodeDecodeError:
@@ -116,6 +120,44 @@ def contract_compliance():
         except Exception as e:
             app.logger.error(f"Failed to read file: {str(e)}")
             return jsonify({"error": f"Failed to read the uploaded file: {str(e)}"}), 500
+
+        # Process laws and compliance check
+        selected_laws = request.form.getlist("selected_laws")
+        laws = load_laws()
+        compliance_results = []
+
+        for law_id in selected_laws:
+            if law_id in laws:
+                law_text = laws[law_id]
+                try:
+                    # Perform compliance check using Cohere
+                    response = co.compare(inputs=[user_content, law_text])
+                    similarity = response.similarity
+                    compliance_results.append({
+                        "law_id": law_id,
+                        "status": "Compliant" if similarity > 0.8 else "Non-Compliant",
+                        "details": f"Similarity score: {similarity:.2f}"
+                    })
+                except Exception as e:
+                    app.logger.error(f"Error comparing law {law_id}: {str(e)}")
+                    compliance_results.append({
+                        "law_id": law_id,
+                        "status": "Error",
+                        "details": f"Error during compliance check: {str(e)}"
+                    })
+            else:
+                compliance_results.append({
+                    "law_id": law_id,
+                    "status": "Not Found",
+                    "details": "Law not found in the system."
+                })
+
+        return jsonify({"result": compliance_results}), 200
+
+    except Exception as e:
+        app.logger.error(f"Unexpected error in contract_compliance: {str(e)}")
+        return jsonify({"error": "Internal server error", "details": str(e)}), 500
+
 
         # Placeholder: Compliance logic here
         return jsonify({"result": "Placeholder for compliance result"}), 200
