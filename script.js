@@ -16,9 +16,18 @@ document.addEventListener("DOMContentLoaded", () => {
     const fileInput = document.getElementById("file-input");
     const radioCohereChat = document.getElementById("radio-cohere-chat");
     const radioContractCompliance = document.getElementById("radio-contract-compliance");
+    const lawSelectionContainer = document.createElement("div"); // For law checkboxes
 
     let isAuthenticated = false;
     let logoutTimer;
+
+    // Predefined laws
+    const laws = {
+        "1": "Sales Law 1973",
+        "2": "Investment Assurance 1974",
+        "3": "Investment Assurance Amendment 9",
+        "4": "Sales Regulations 1975",
+    };
 
     // Helper to close all open popups
     const closeAllPopups = () => {
@@ -36,14 +45,14 @@ document.addEventListener("DOMContentLoaded", () => {
     // Show Sign-In Popup
     signInLink.addEventListener("click", (e) => {
         e.preventDefault();
-        closeAllPopups(); // Close other popups
+        closeAllPopups();
         signInPopup.classList.remove("hidden");
     });
 
     // Show Forgot Password Popup
     forgotPasswordLink.addEventListener("click", (e) => {
         e.preventDefault();
-        closeAllPopups(); // Close other popups
+        closeAllPopups();
         forgotPasswordPopup.classList.remove("hidden");
     });
 
@@ -94,37 +103,39 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 
-    // Handle Login Form Submission
-    loginForm.addEventListener("submit", async (e) => {
-        e.preventDefault();
-        const email = document.getElementById("login-email").value;
-        const password = document.getElementById("login-password").value;
+    // Handle Service Selection
+    const handleServiceChange = () => {
+        if (radioContractCompliance.checked) {
+            // Add message to chat for contract compliance
+            addMessage("bot", "Upload a contract file for compliance check.");
+            fileInput.classList.remove("hidden");
 
-        try {
-            const response = await fetch("/api/login", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ email, password }),
+            // Render law checkboxes
+            lawSelectionContainer.innerHTML = "<h3>Select Laws to Check:</h3>";
+            Object.keys(laws).forEach((lawId) => {
+                const checkbox = document.createElement("input");
+                checkbox.type = "checkbox";
+                checkbox.id = `law-${lawId}`;
+                checkbox.value = lawId;
+                const label = document.createElement("label");
+                label.htmlFor = `law-${lawId}`;
+                label.textContent = laws[lawId];
+                lawSelectionContainer.appendChild(checkbox);
+                lawSelectionContainer.appendChild(label);
+                lawSelectionContainer.appendChild(document.createElement("br"));
             });
-            const data = await response.json();
-            if (response.ok) {
-                const { token } = data;
-                localStorage.setItem("authToken", token);
-                isAuthenticated = true;
-                showFeedback("Login successful!", false);
-                loginForm.reset(); // Clear email and password fields
-                chatsContainer.classList.remove("hidden");
-                loginForm.parentElement.classList.add("hidden");
-                resetLogoutTimer();
-            } else {
-                showFeedback(data.error || "Login failed.", true);
-            }
-        } catch (err) {
-            showFeedback("Login failed. Please try again.", true);
+            fileInput.parentElement.appendChild(lawSelectionContainer);
+        } else {
+            // Reset UI for Cohere Chat
+            lawSelectionContainer.innerHTML = "";
+            fileInput.classList.add("hidden");
         }
-    });
+    };
 
-    // Handle Chat or Contract Compliance
+    radioCohereChat.addEventListener("change", handleServiceChange);
+    radioContractCompliance.addEventListener("change", handleServiceChange);
+
+    // Handle Contract Compliance Submission
     cohereSendBtn.addEventListener("click", async () => {
         if (!isAuthenticated) {
             showFeedback("You must log in to use the service!", true);
@@ -133,42 +144,27 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const authToken = localStorage.getItem("authToken");
 
-        if (radioCohereChat.checked) {
-            // Handle Cohere Chat
-            const message = cohereUserInput.value.trim();
-            if (!message) return;
-
-            addMessage("user", message);
-            cohereUserInput.value = "";
-
-            try {
-                const response = await fetch("/api/cohere-chat", {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                        "Authorization": `Bearer ${authToken}`,
-                    },
-                    body: JSON.stringify({ message }),
-                });
-                const data = await response.json();
-                if (response.ok) {
-                    addMessage("bot", data.reply || "No response.");
-                } else {
-                    addMessage("bot", data.error || "Error connecting to server.");
-                }
-            } catch (err) {
-                addMessage("bot", "Error connecting to server.");
-            }
-        } else if (radioContractCompliance.checked) {
-            // Handle Contract Compliance
+        if (radioContractCompliance.checked) {
+            // Ensure a file is uploaded
             const file = fileInput.files[0];
             if (!file) {
                 showFeedback("Please upload a file for analysis.", true);
                 return;
             }
 
+            // Collect selected laws
+            const selectedLaws = Array.from(
+                lawSelectionContainer.querySelectorAll("input[type=checkbox]:checked")
+            ).map((checkbox) => checkbox.value);
+
+            if (selectedLaws.length === 0) {
+                showFeedback("Please select at least one law for analysis.", true);
+                return;
+            }
+
             const formData = new FormData();
             formData.append("file", file);
+            formData.append("selected_laws", selectedLaws);
 
             try {
                 const response = await fetch("/api/contract-compliance", {
@@ -178,9 +174,15 @@ document.addEventListener("DOMContentLoaded", () => {
                     },
                     body: formData,
                 });
+
                 const data = await response.json();
                 if (response.ok) {
-                    addMessage("bot", `Compliance Result: ${data.result.status}\nDetails: ${data.result.details}`);
+                    data.result.forEach((res) => {
+                        addMessage(
+                            "bot",
+                            `Law: ${laws[res.law_id]} - Status: ${res.status} - ${res.details}`
+                        );
+                    });
                 } else {
                     addMessage("bot", data.error || "Error connecting to server.");
                 }

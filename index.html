@@ -82,11 +82,17 @@
                             Contract Compliance
                         </label>
                     </div>
+                    <div id="contract-compliance-section" class="hidden">
+                        <h4>Upload Contract and Select Laws</h4>
+                        <label for="file-input">Upload Contract File:</label>
+                        <input type="file" id="file-input" accept=".txt,.doc,.docx,.pdf">
+                        
+                        <h4>Select Laws to Compare:</h4>
+                        <div id="law-selection">
+                            <!-- Laws dynamically loaded via JS -->
+                        </div>
+                    </div>
                     <textarea id="cohere-user-input" placeholder="Type your message..." aria-label="Message input"></textarea>
-                    <label for="file-input" class="file-upload-label hidden">
-                        Upload File
-                        <input type="file" id="file-input" class="hidden" aria-label="Upload file for Contract Compliance">
-                    </label>
                     <button id="cohere-send-btn" aria-label="Send message">Send</button>
                 </div>
             </div>
