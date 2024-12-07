@@ -177,56 +177,48 @@ document.addEventListener("DOMContentLoaded", () => {
                 return;
             }
 
-const selectedLaws = Array.from(
-    lawSelectionContainer.querySelectorAll("input[type=checkbox]:checked")
-).map((checkbox) => checkbox.value);
+            const selectedLaws = Array.from(
+                lawSelectionContainer.querySelectorAll("input[type=checkbox]:checked")
+            ).map((checkbox) => checkbox.value);
 
-if (!selectedLaws.length) {
-    showFeedback("Please select at least one law for analysis.", true);
-    return;
-}
+            if (!selectedLaws.length) {
+                showFeedback("Please select at least one law for analysis.", true);
+                return;
+            }
 
-if (!fileInput.files[0]) {
-    showFeedback("Please upload a file for analysis.", true);
-    return;
-}
+            const formData = new FormData();
+            formData.append("file", file);
+            selectedLaws.forEach((law) => formData.append("selected_laws", law));
 
-const formData = new FormData();
-formData.append("file", fileInput.files[0]);
-selectedLaws.forEach((law) => formData.append("selected_laws", law));
+            try {
+                const response = await fetch("/api/contract-compliance", {
+                    method: "POST",
+                    headers: {
+                        Authorization: `Bearer ${authToken}`,
+                    },
+                    body: formData,
+                });
 
-
-try {
-    const response = await fetch("/api/contract-compliance", {
-        method: "POST",
-        headers: {
-            Authorization: `Bearer ${authToken}`,
-        },
-        body: formData,
-    });
-
-    const data = await response.json();
-    console.log("Server Response:", data); // Add this to debug the response
-    if (response.ok) {
-        // Process response
-        if (Array.isArray(data.result)) {
-            data.result.forEach((res) => {
-                addMessage(
-                    "bot",
-                    `Law: ${laws[res.law_id]} - Status: ${res.status} - ${res.details || "No details"}`
-                );
-            });
-        } else {
-            // Handle non-array result
-            addMessage("bot", `Unexpected response format: ${JSON.stringify(data.result)}`);
+                const data = await response.json();
+                console.log("Server Response:", data);
+                if (response.ok) {
+                    if (Array.isArray(data.result)) {
+                        data.result.forEach((res) => {
+                            addMessage(
+                                "bot",
+                                `Law: ${laws[res.law_id]} - Status: ${res.status} - ${res.details || "No details"}`
+                            );
+                        });
+                    } else {
+                        addMessage("bot", `Unexpected response format: ${JSON.stringify(data.result)}`);
+                    }
+                } else {
+                    addMessage("bot", data.error || "Error connecting to server.");
+                }
+            } catch (err) {
+                addMessage("bot", "Error connecting to server.");
+            }
         }
-    } else {
-        addMessage("bot", data.error || "Error connecting to server.");
-    }
-} catch (err) {
-    addMessage("bot", "Error connecting to server.");
-}
-
     });
 
     const addMessage = (sender, message) => {
