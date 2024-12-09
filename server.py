@@ -7,6 +7,8 @@ import cohere
 from datetime import datetime, timedelta
 import os
 import jwt
+from sklearn.metrics.pairwise import cosine_similarity
+import numpy as np
 
 app = Flask(__name__)
 
@@ -114,6 +116,9 @@ def login():
     else:
         return jsonify({"error": "Invalid email or password"}), 401
 
+from sklearn.metrics.pairwise import cosine_similarity
+import numpy as np
+
 @app.route("/api/contract-compliance", methods=["POST"])
 def contract_compliance():
     try:
@@ -161,9 +166,16 @@ def contract_compliance():
             if law_id in laws:
                 law_text = laws[law_id]
                 try:
-                    # Perform compliance check using Cohere
-                    response = co.compare(inputs=[user_content, law_text])
-                    similarity = response.similarity
+                    # Generate embeddings for the user content and the law text
+                    embeddings = co.embed(texts=[user_content, law_text])
+                    user_vector, law_vector = embeddings.embeddings
+
+                    # Compute cosine similarity
+                    similarity = cosine_similarity(
+                        [np.array(user_vector)],
+                        [np.array(law_vector)]
+                    )[0][0]
+
                     compliance_results.append({
                         "law_id": law_id,
                         "status": "Compliant" if similarity > 0.8 else "Non-Compliant",
@@ -188,6 +200,7 @@ def contract_compliance():
     except Exception as e:
         app.logger.error(f"Unexpected error in contract_compliance: {str(e)}")
         return jsonify({"error": "Internal server error", "details": str(e)}), 500
+
 
 
 # Static File Serving
