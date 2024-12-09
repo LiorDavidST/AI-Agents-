@@ -50,14 +50,11 @@ def load_laws():
     """Load laws from the HookeyMecher directory."""
     laws = {}
     try:
-        # Iterate through all files in the HookeyMecher directory
         for filename in os.listdir(LAWS_FOLDER):
             if filename.endswith(".txt"):
-                # Extract the law ID from the filename
                 law_id = os.path.splitext(filename)[0].strip()
                 file_path = os.path.join(LAWS_FOLDER, filename)
                 try:
-                    # Read the content of the file safely
                     with open(file_path, "r", encoding="utf-8") as file:
                         laws[law_id] = file.read()
                     app.logger.info(f"Successfully loaded law file: {filename}")
@@ -65,18 +62,19 @@ def load_laws():
                     app.logger.error(f"Failed to decode file {filename}. Ensure it's UTF-8 encoded.")
                 except Exception as e:
                     app.logger.error(f"Error reading file {filename}: {str(e)}")
-        
-        # Log the successfully loaded laws
         if laws:
             app.logger.info(f"Loaded law IDs: {list(laws.keys())}")
         else:
             app.logger.warning("No valid laws were loaded from the HookeyMecher directory.")
-
     except Exception as e:
         app.logger.error(f"Error loading laws from directory: {str(e)}")
-    
     return laws
 
+def chunk_text(text, max_tokens=512):
+    """Split text into chunks of at most `max_tokens` words."""
+    words = text.split()  # Split text by whitespace
+    for i in range(0, len(words), max_tokens):
+        yield " ".join(words[i:i + max_tokens])
 
 @app.route("/api/sign-in", methods=["POST"])
 def sign_in():
@@ -116,13 +114,10 @@ def login():
     else:
         return jsonify({"error": "Invalid email or password"}), 401
 
-from sklearn.metrics.pairwise import cosine_similarity
-import numpy as np
-
 @app.route("/api/contract-compliance", methods=["POST"])
 def contract_compliance():
     try:
-        # Validate Authorization token
+        # Authorization and file validation
         token = request.headers.get("Authorization")
         if not token:
             return jsonify({"error": "Authorization token is missing"}), 401
@@ -132,7 +127,6 @@ def contract_compliance():
         if not email:
             return jsonify({"error": "Invalid or expired token"}), 401
 
-        # Validate file and selected laws
         if "file" not in request.files or not request.form.getlist("selected_laws"):
             return jsonify({"error": "File and selected laws are required"}), 400
 
@@ -140,12 +134,10 @@ def contract_compliance():
         if file.filename == "":
             return jsonify({"error": "No file selected"}), 400
 
-        # Save uploaded file
         filename = secure_filename(file.filename)
         file_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
         file.save(file_path)
 
-        # Read and decode uploaded file content
         try:
             with open(file_path, "rb") as f:
                 file_content = f.read()
@@ -166,11 +158,15 @@ def contract_compliance():
             if law_id in laws:
                 law_text = laws[law_id]
                 try:
-                    # Generate embeddings for the user content and the law text
-                    embeddings = co.embed(texts=[user_content, law_text])
-                    user_vector, law_vector = embeddings.embeddings
+                    user_chunks = list(chunk_text(user_content, max_tokens=512))
+                    law_chunks = list(chunk_text(law_text, max_tokens=512))
 
-                    # Compute cosine similarity
+                    user_embeddings = co.embed(texts=user_chunks).embeddings
+                    law_embeddings = co.embed(texts=law_chunks).embeddings
+
+                    user_vector = np.mean(user_embeddings, axis=0)
+                    law_vector = np.mean(law_embeddings, axis=0)
+
                     similarity = cosine_similarity(
                         [np.array(user_vector)],
                         [np.array(law_vector)]
@@ -200,8 +196,6 @@ def contract_compliance():
     except Exception as e:
         app.logger.error(f"Unexpected error in contract_compliance: {str(e)}")
         return jsonify({"error": "Internal server error", "details": str(e)}), 500
-
-
 
 # Static File Serving
 @app.route("/", methods=["GET"])
