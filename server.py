@@ -48,15 +48,33 @@ def load_laws():
     """Load laws from the HookeyMecher directory."""
     laws = {}
     try:
+        # Iterate through all files in the HookeyMecher directory
         for filename in os.listdir(LAWS_FOLDER):
             if filename.endswith(".txt"):
-                # Normalize the filename for matching
+                # Extract the law ID from the filename
                 law_id = os.path.splitext(filename)[0].strip()
-                laws[law_id] = open(os.path.join(LAWS_FOLDER, filename), "r", encoding="utf-8").read()
-        app.logger.info(f"Loaded laws: {list(laws.keys())}")
+                file_path = os.path.join(LAWS_FOLDER, filename)
+                try:
+                    # Read the content of the file safely
+                    with open(file_path, "r", encoding="utf-8") as file:
+                        laws[law_id] = file.read()
+                    app.logger.info(f"Successfully loaded law file: {filename}")
+                except UnicodeDecodeError:
+                    app.logger.error(f"Failed to decode file {filename}. Ensure it's UTF-8 encoded.")
+                except Exception as e:
+                    app.logger.error(f"Error reading file {filename}: {str(e)}")
+        
+        # Log the successfully loaded laws
+        if laws:
+            app.logger.info(f"Loaded law IDs: {list(laws.keys())}")
+        else:
+            app.logger.warning("No valid laws were loaded from the HookeyMecher directory.")
+
     except Exception as e:
-        app.logger.error(f"Error loading laws: {str(e)}")
+        app.logger.error(f"Error loading laws from directory: {str(e)}")
+    
     return laws
+
 
 @app.route("/api/sign-in", methods=["POST"])
 def sign_in():
