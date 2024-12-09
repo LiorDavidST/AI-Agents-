@@ -9,6 +9,7 @@ import os
 import jwt
 from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
+import tiktoken
 
 app = Flask(__name__)
 
