@@ -177,9 +177,11 @@ def contract_compliance():
                     app.logger.info(f"Number of user_chunks: {len(user_chunks)}")
                     app.logger.info(f"Number of law_chunks: {len(law_chunks)}")
                     for i, chunk in enumerate(user_chunks):
-                        app.logger.info(f"User chunk {i} length: {len(chunk.split())} words")
+                        chunk_tokens = tiktoken.get_encoding("cl100k_base").encode(chunk)
+                        app.logger.info(f"User chunk {i} - Tokens: {len(chunk_tokens)}")
                     for i, chunk in enumerate(law_chunks):
-                        app.logger.info(f"Law chunk {i} length: {len(chunk.split())} words")
+                        chunk_tokens = tiktoken.get_encoding("cl100k_base").encode(chunk)
+                        app.logger.info(f"Law chunk {i} - Tokens: {len(chunk_tokens)}")
 
                     # Generate embeddings for all chunks
                     user_embeddings = co.embed(texts=user_chunks).embeddings
