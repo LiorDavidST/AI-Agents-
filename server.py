@@ -73,11 +73,17 @@ def load_laws():
 
 def chunk_text(text, max_tokens=512):
     """Split text into chunks of at most `max_tokens` tokens."""
-    tokenizer = tiktoken.encoding_for_model("cohere")  # Use Cohere-compatible tokenizer
+    # Explicitly use the cl100k_base tokenizer
+    tokenizer = tiktoken.get_encoding("cl100k_base")
+
+    # Encode the text into tokens
     tokens = tokenizer.encode(text)
 
+    # Split tokens into chunks of max_tokens size
     for i in range(0, len(tokens), max_tokens):
         chunk_tokens = tokens[i:i + max_tokens]
+
+        # Decode the tokens back into text and yield chunks
         yield tokenizer.decode(chunk_tokens)
 
 @app.route("/api/sign-in", methods=["POST"])
