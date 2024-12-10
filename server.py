@@ -75,20 +75,21 @@ def chunk_text(text, max_tokens=512):
     """Split text into chunks of at most `max_tokens` tokens."""
     tokenizer = tiktoken.get_encoding("cl100k_base")
     tokens = tokenizer.encode(text)
-    
-    # Split tokens into chunks
     chunks = []
+
+    # Split tokens into chunks and verify lengths
     for i in range(0, len(tokens), max_tokens):
         chunk_tokens = tokens[i:i + max_tokens]
-        chunks.append(tokenizer.decode(chunk_tokens))
-    
-    # Verify token lengths of chunks
-    for i, chunk in enumerate(chunks):
-        chunk_tokens = tokenizer.encode(chunk)
-        if len(chunk_tokens) > max_tokens:
-            raise ValueError(f"Chunk {i} exceeds max token limit with {len(chunk_tokens)} tokens.")
-    
+        chunk_text = tokenizer.decode(chunk_tokens)
+        chunk_token_count = len(tokenizer.encode(chunk_text))  # Recalculate tokens after decoding
+
+        if chunk_token_count > max_tokens:
+            raise ValueError(f"Chunk exceeds max token limit with {chunk_token_count} tokens.")
+        
+        chunks.append(chunk_text)
+
     return chunks
+
 
 
 @app.route("/api/sign-in", methods=["POST"])
@@ -174,46 +175,47 @@ def contract_compliance():
             if law_id in laws:
                 law_text = laws[law_id]
                 try:
-                    # Chunk the user content and law text
-                    user_chunks = list(chunk_text(user_content, max_tokens=512))
-                    law_chunks = list(chunk_text(law_text, max_tokens=512))
+    # Chunk the user content and law text
+    user_chunks = list(chunk_text(user_content, max_tokens=512))
+    law_chunks = list(chunk_text(law_text, max_tokens=512))
 
-                    # Log the chunk sizes
-                    app.logger.info(f"Number of user_chunks: {len(user_chunks)}")
-                    app.logger.info(f"Number of law_chunks: {len(law_chunks)}")
-                    for i, chunk in enumerate(user_chunks):
-                        chunk_tokens = tiktoken.get_encoding("cl100k_base").encode(chunk)
-                        app.logger.info(f"User chunk {i} - Tokens: {len(chunk_tokens)}")
-                    for i, chunk in enumerate(law_chunks):
-                        chunk_tokens = tiktoken.get_encoding("cl100k_base").encode(chunk)
-                        app.logger.info(f"Law chunk {i} - Tokens: {len(chunk_tokens)}")
+    # Log the chunk sizes and token counts
+    app.logger.info(f"Number of user_chunks: {len(user_chunks)}")
+    app.logger.info(f"Number of law_chunks: {len(law_chunks)}")
+    for i, chunk in enumerate(user_chunks):
+        chunk_tokens = tiktoken.get_encoding("cl100k_base").encode(chunk)
+        app.logger.info(f"User chunk {i} - Tokens: {len(chunk_tokens)}")
+    for i, chunk in enumerate(law_chunks):
+        chunk_tokens = tiktoken.get_encoding("cl100k_base").encode(chunk)
+        app.logger.info(f"Law chunk {i} - Tokens: {len(chunk_tokens)}")
 
-                    # Generate embeddings for all chunks
-                    user_embeddings = co.embed(texts=user_chunks).embeddings
-                    law_embeddings = co.embed(texts=law_chunks).embeddings
+    # Generate embeddings for all chunks
+    user_embeddings = co.embed(texts=user_chunks).embeddings
+    law_embeddings = co.embed(texts=law_chunks).embeddings
 
-                    # Aggregate embeddings (e.g., by averaging)
-                    user_vector = np.mean(user_embeddings, axis=0)
-                    law_vector = np.mean(law_embeddings, axis=0)
+    # Aggregate embeddings (e.g., by averaging)
+    user_vector = np.mean(user_embeddings, axis=0)
+    law_vector = np.mean(law_embeddings, axis=0)
 
-                    # Compute cosine similarity
-                    similarity = cosine_similarity(
-                        [np.array(user_vector)],
-                        [np.array(law_vector)]
-                    )[0][0]
+    # Compute cosine similarity
+    similarity = cosine_similarity(
+        [np.array(user_vector)],
+        [np.array(law_vector)]
+    )[0][0]
 
-                    compliance_results.append({
-                        "law_id": law_id,
-                        "status": "Compliant" if similarity > 0.8 else "Non-Compliant",
-                        "details": f"Similarity score: {similarity:.2f}"
-                    })
-                except Exception as e:
-                    app.logger.error(f"Error comparing law {law_id}: {str(e)}")
-                    compliance_results.append({
-                        "law_id": law_id,
-                        "status": "Error",
-                        "details": f"Error during compliance check: {str(e)}"
-                    })
+    compliance_results.append({
+        "law_id": law_id,
+        "status": "Compliant" if similarity > 0.8 else "Non-Compliant",
+        "details": f"Similarity score: {similarity:.2f}"
+    })
+except Exception as e:
+    app.logger.error(f"Error comparing law {law_id}: {str(e)}")
+    compliance_results.append({
+        "law_id": law_id,
+        "status": "Error",
+        "details": f"Error during compliance check: {str(e)}"
+    })
+
             else:
                 compliance_results.append({
                     "law_id": law_id,
