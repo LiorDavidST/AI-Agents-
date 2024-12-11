@@ -76,16 +76,21 @@ def chunk_text(text, max_tokens=512):
     tokenizer = tiktoken.get_encoding("cl100k_base")
     tokens = tokenizer.encode(text)  # Encode the text into tokens
     chunks = []
+    current_chunk = []
 
-    for i in range(0, len(tokens), max_tokens):
-        chunk_tokens = tokens[i:i + max_tokens]
-        chunks.append(tokenizer.decode(chunk_tokens))  # Decode the chunk directly
+    for token in tokens:
+        current_chunk.append(token)
+        # If adding the token exceeds the limit, save the chunk
+        if len(current_chunk) >= max_tokens:
+            chunks.append(tokenizer.decode(current_chunk))
+            current_chunk = []  # Start a new chunk
 
-        # Ensure the chunk length does not exceed max_tokens
-        if len(chunk_tokens) > max_tokens:
-            raise ValueError(f"Chunk exceeds max token limit with {len(chunk_tokens)} tokens.")
+    # Add any remaining tokens as the last chunk
+    if current_chunk:
+        chunks.append(tokenizer.decode(current_chunk))
 
     return chunks
+
 
 
 @app.route("/api/sign-in", methods=["POST"])
@@ -179,12 +184,6 @@ def contract_compliance():
                     app.logger.info(f"Number of user_chunks: {len(user_chunks)}")
                     app.logger.info(f"Number of law_chunks: {len(law_chunks)}")
 
-                    for i, chunk in enumerate(user_chunks):
-                        app.logger.info(f"User chunk {i} - Length: {len(chunk)} characters")
-
-                    for i, chunk in enumerate(law_chunks):
-                        app.logger.info(f"Law chunk {i} - Length: {len(chunk)} characters")
-
                     # Generate embeddings for all chunks
                     user_embeddings = co.embed(texts=user_chunks).embeddings
                     law_embeddings = co.embed(texts=law_chunks).embeddings
@@ -208,6 +207,67 @@ def contract_compliance():
                         "status": "Error",
                         "details": f"Error during compliance check: {str(e)}"
                     })
+            else:
+                compliance_results.append({
+                    "law_id": law_id,
+                    "status": "Not Found",
+                    "details": "Law not found in the system."
+                })
+
+        return jsonify({"result": compliance_results}), 200
+
+    except Exception as e:
+        app.logger.error(f"Unexpected error in contract_compliance: {str(e)}")
+        return jsonify({"error": "Internal server error", "details": str(e)}), 500
+
+
+        # Process laws and compliance check
+        selected_laws = request.form.getlist("selected_laws")
+        laws = load_laws()
+        compliance_results = []
+
+        for law_id in selected_laws:
+            if law_id in laws:
+                law_text = laws[law_id]
+                try:
+    # Chunk the user content and law text
+    user_chunks = chunk_text(user_content, max_tokens=512)
+    law_chunks = chunk_text(law_text, max_tokens=512)
+
+    # Log chunk details for debugging
+    app.logger.info(f"Number of user_chunks: {len(user_chunks)}")
+    app.logger.info(f"Number of law_chunks: {len(law_chunks)}")
+
+    for i, chunk in enumerate(user_chunks):
+        app.logger.info(f"User chunk {i} - Length: {len(chunk)} characters")
+
+    for i, chunk in enumerate(law_chunks):
+        app.logger.info(f"Law chunk {i} - Length: {len(chunk)} characters")
+
+    # Generate embeddings for all chunks
+    user_embeddings = co.embed(texts=user_chunks).embeddings
+    law_embeddings = co.embed(texts=law_chunks).embeddings
+
+    # Aggregate embeddings
+    user_vector = np.mean(user_embeddings, axis=0)
+    law_vector = np.mean(law_embeddings, axis=0)
+
+    # Compute cosine similarity
+    similarity = cosine_similarity([user_vector], [law_vector])[0][0]
+
+    compliance_results.append({
+        "law_id": law_id,
+        "status": "Compliant" if similarity > 0.8 else "Non-Compliant",
+        "details": f"Similarity score: {similarity:.2f}"
+    })
+except Exception as e:
+    app.logger.error(f"Error comparing law {law_id}: {str(e)}")
+    compliance_results.append({
+        "law_id": law_id,
+        "status": "Error",
+        "details": f"Error during compliance check: {str(e)}"
+    })
+
             else:
                 compliance_results.append({
                     "law_id": law_id,
