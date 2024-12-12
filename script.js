@@ -16,88 +16,152 @@ document.addEventListener("DOMContentLoaded", () => {
     const fileInput = document.getElementById("file-input");
     const radioCohereChat = document.getElementById("radio-cohere-chat");
     const radioContractCompliance = document.getElementById("radio-contract-compliance");
-    const contractComplianceSection = document.getElementById("contract-compliance-section");
-    const lawSelectionContainer = document.getElementById("law-selection");
+    const lawSelectionContainer = document.createElement("div");
 
     let isAuthenticated = false;
     let logoutTimer;
-    let laws = {};
 
-    // Fetch predefined laws from the backend
-    async function fetchLaws() {
-        try {
-            const response = await fetch('/api/predefined-laws');
-            const data = await response.json();
-            if (response.ok && data.laws) {
-                laws = data.laws;
-                console.log("Fetched laws:", laws);
-            } else {
-                console.error("Failed to fetch laws", data);
-            }
-        } catch (error) {
-            console.error("Error fetching laws:", error);
-        }
-    }
+    // Predefined laws
+    const laws = {
+        "1": "חוק מכר דירות  1973",
+        "2": "חוק מכר דירות הבטחת השקעה 1974",
+        "3": "חוק מכר דירות הבטחת השקעה תיקון מספר 9",
+        "4": "תקנות המכר (דירות) (הבטחת השקעות של רוכשי דירות) (סייג לתשלומים על חשבון מחיר דירה), -1975",
+    };
 
-    // Populate law selection dynamically
-    async function populateLawOptions() {
-        await fetchLaws();
-        lawSelectionContainer.innerHTML = "<h3>Select Laws to Check:</h3>";
-        Object.keys(laws).forEach((lawId) => {
-            const checkbox = document.createElement("input");
-            checkbox.type = "checkbox";
-            checkbox.id = `law-${lawId}`;
-            checkbox.value = lawId;
-            const label = document.createElement("label");
-            label.htmlFor = `law-${lawId}`;
-            label.textContent = laws[lawId];
-            lawSelectionContainer.appendChild(checkbox);
-            lawSelectionContainer.appendChild(label);
-            lawSelectionContainer.appendChild(document.createElement("br"));
-        });
-    }
-
-    // Helper to close all popups
+    // Helper to close all open popups
     const closeAllPopups = () => {
         signInPopup.classList.add("hidden");
         forgotPasswordPopup.classList.add("hidden");
     };
 
-    // Close popups
+    // Close Popup
     closeButtons.forEach((button) => {
         button.addEventListener("click", () => {
             button.closest(".popup").classList.add("hidden");
         });
     });
 
-    // Show sign-in popup
+    // Show Sign-In Popup
     signInLink.addEventListener("click", (e) => {
         e.preventDefault();
         closeAllPopups();
         signInPopup.classList.remove("hidden");
     });
 
-    // Show forgot password popup
+    // Show Forgot Password Popup
     forgotPasswordLink.addEventListener("click", (e) => {
         e.preventDefault();
         closeAllPopups();
         forgotPasswordPopup.classList.remove("hidden");
     });
 
-    // Handle service selection
+    // Handle Sign-In Form Submission
+    signInForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const email = document.getElementById("sign-in-email").value;
+        const password = document.getElementById("sign-in-password").value;
+
+        try {
+            const response = await fetch("/api/sign-in", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email, password }),
+            });
+            const data = await response.json();
+            if (response.ok) {
+                showFeedback("Sign-up successful! Please log in.", false);
+                signInPopup.classList.add("hidden");
+            } else {
+                showFeedback(data.error || "Sign-up failed.", true);
+            }
+        } catch (err) {
+            showFeedback("An error occurred. Please try again.", true);
+        }
+    });
+
+    // Handle Forgot Password Form Submission
+    forgotPasswordForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const email = document.getElementById("forgot-password-email").value;
+
+        try {
+            const response = await fetch("/api/forgot-password", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email }),
+            });
+            const data = await response.json();
+            if (response.ok) {
+                showFeedback("Password sent to your email.", false);
+                forgotPasswordPopup.classList.add("hidden");
+            } else {
+                showFeedback(data.error || "Error sending password.", true);
+            }
+        } catch (err) {
+            showFeedback("An error occurred. Please try again.", true);
+        }
+    });
+
+    // Handle Login Form Submission
+    loginForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const email = document.getElementById("login-email").value;
+        const password = document.getElementById("login-password").value;
+
+        try {
+            const response = await fetch("/api/login", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email, password }),
+            });
+            const data = await response.json();
+            if (response.ok) {
+                const { token } = data;
+                localStorage.setItem("authToken", token);
+                isAuthenticated = true;
+                showFeedback("Login successful!", false);
+                loginForm.reset();
+                chatsContainer.classList.remove("hidden");
+                loginForm.parentElement.classList.add("hidden");
+                resetLogoutTimer();
+            } else {
+                showFeedback(data.error || "Login failed.", true);
+            }
+        } catch (err) {
+            showFeedback("Login failed. Please try again.", true);
+        }
+    });
+
+    // Handle Service Selection
     const handleServiceChange = () => {
         if (radioContractCompliance.checked) {
-            contractComplianceSection.classList.remove("hidden");
-            populateLawOptions();
+            addMessage("bot", "Upload a contract file for compliance check.");
+            fileInput.classList.remove("hidden");
+            lawSelectionContainer.innerHTML = "<h3>Select Laws to Check:</h3>";
+            Object.keys(laws).forEach((lawId) => {
+                const checkbox = document.createElement("input");
+                checkbox.type = "checkbox";
+                checkbox.id = `law-${lawId}`;
+                checkbox.value = lawId;
+                const label = document.createElement("label");
+                label.htmlFor = `law-${lawId}`;
+                label.textContent = laws[lawId];
+                lawSelectionContainer.appendChild(checkbox);
+                lawSelectionContainer.appendChild(label);
+                lawSelectionContainer.appendChild(document.createElement("br"));
+            });
+            fileInput.parentElement.appendChild(lawSelectionContainer);
         } else {
-            contractComplianceSection.classList.add("hidden");
+            lawSelectionContainer.innerHTML = "";
+            fileInput.classList.add("hidden");
         }
     };
 
     radioCohereChat.addEventListener("change", handleServiceChange);
     radioContractCompliance.addEventListener("change", handleServiceChange);
 
-    // Handle contract compliance submission
+    // Handle Contract Compliance Submission
     cohereSendBtn.addEventListener("click", async () => {
         if (!isAuthenticated) {
             showFeedback("You must log in to use the service!", true);
@@ -136,13 +200,18 @@ document.addEventListener("DOMContentLoaded", () => {
                 });
 
                 const data = await response.json();
+                console.log("Server Response:", data);
                 if (response.ok) {
-                    data.result.forEach((res) => {
-                        addMessage(
-                            "bot",
-                            `Law: ${laws[res.law_id]} - Status: ${res.status} - ${res.details || "No details"}`
-                        );
-                    });
+                    if (Array.isArray(data.result)) {
+                        data.result.forEach((res) => {
+                            addMessage(
+                                "bot",
+                                `Law: ${laws[res.law_id]} - Status: ${res.status} - ${res.details || "No details"}`
+                            );
+                        });
+                    } else {
+                        addMessage("bot", `Unexpected response format: ${JSON.stringify(data.result)}`);
+                    }
                 } else {
                     addMessage("bot", data.error || "Error connecting to server.");
                 }
@@ -170,6 +239,13 @@ document.addEventListener("DOMContentLoaded", () => {
         }, 3000);
     };
 
-    // Initialize UI
-    handleServiceChange();
+    const resetLogoutTimer = () => {
+        clearTimeout(logoutTimer);
+        logoutTimer = setTimeout(() => {
+            isAuthenticated = false;
+            localStorage.removeItem("authToken");
+            showFeedback("Session expired. Please log in again.", true);
+            location.reload();
+        }, 30 * 60 * 1000);
+    };
 });
