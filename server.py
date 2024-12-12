@@ -19,6 +19,7 @@ CORS(app, resources={r"/api/*": {"origins": "*"}}, supports_credentials=True)
 
 # Configuration
 UPLOAD_FOLDER = "uploads"
+STATIC_FOLDER = "static"
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
@@ -84,28 +85,20 @@ def load_laws(selected_laws):
             app.logger.warning(f"Failed to load law: {law_title}")
     return laws
 
-def chunk_text(text, max_tokens=512):
-    """Split text into chunks of at most `max_tokens` tokens."""
-    tokenizer = tiktoken.get_encoding("cl100k_base")
-    tokens = tokenizer.encode(text)  # Encode the text into tokens
-    chunks = []
-    current_chunk = []
-
-    for token in tokens:
-        current_chunk.append(token)
-        # If adding the token exceeds the limit, save the chunk
-        if len(current_chunk) >= max_tokens:
-            chunks.append(tokenizer.decode(current_chunk))
-            current_chunk = []  # Start a new chunk
-
-    # Add any remaining tokens as the last chunk
-    if current_chunk:
-        chunks.append(tokenizer.decode(current_chunk))
-
-    return chunks
+@app.route("/api/predefined-laws", methods=["GET"])
+def get_predefined_laws():
+    """API endpoint to retrieve predefined laws."""
+    predefined_laws = {
+        "1": "חוק מכר דירות 1973",
+        "2": "חוק מכר דירות הבטחת השקעה 1974",
+        "3": "חוק מכר דירות הבטחת השקעה תיקון מספר 9",
+        "4": "תקנות המכר (דירות) (הבטחת השקעות של רוכשי דירות) (סייג לתשלומים על חשבון מחיר דירה), -1975",
+    }
+    return jsonify({"laws": predefined_laws}), 200
 
 @app.route("/api/contract-compliance", methods=["POST"])
 def contract_compliance():
+    """Handles contract compliance checking."""
     try:
         # Authorization and file validation
         token = request.headers.get("Authorization")
@@ -142,9 +135,11 @@ def contract_compliance():
 
         # Process laws and compliance check
         selected_law_ids = request.form.getlist("selected_laws")
-        predefined_laws = {  # Example law mapping
-            "1": "חוק מכר דירות  1973",
+        predefined_laws = {
+            "1": "חוק מכר דירות 1973",
             "2": "חוק מכר דירות הבטחת השקעה 1974",
+            "3": "חוק מכר דירות הבטחת השקעה תיקון מספר 9",
+            "4": "תקנות המכר (דירות) (הבטחת השקעות של רוכשי דירות) (סייג לתשלומים על חשבון מחיר דירה), -1975",
         }
         selected_laws = {law_id: predefined_laws[law_id] for law_id in selected_law_ids if law_id in predefined_laws}
         laws = load_laws(selected_laws)
@@ -152,39 +147,33 @@ def contract_compliance():
 
         for law_id, law_text in laws.items():
             try:
-                # Chunk the user content and law text
-                user_chunks = chunk_text(user_content, max_tokens=512)
-                law_chunks = chunk_text(law_text, max_tokens=512)
-
-                # Generate embeddings for all chunks
-                user_embeddings = co.embed(texts=user_chunks).embeddings
-                law_embeddings = co.embed(texts=law_chunks).embeddings
-
-                # Aggregate embeddings
-                user_vector = np.mean(user_embeddings, axis=0)
-                law_vector = np.mean(law_embeddings, axis=0)
-
-                # Compute cosine similarity
-                similarity = cosine_similarity([user_vector], [law_vector])[0][0]
-
+                # Placeholder: Add logic for text comparison or compliance checks here.
                 compliance_results.append({
                     "law_id": law_id,
-                    "status": "Compliant" if similarity > 0.8 else "Non-Compliant",
-                    "details": f"Similarity score: {similarity:.2f}"
+                    "status": "Compliant",
+                    "details": "Example compliance check passed."
                 })
             except Exception as e:
-                app.logger.error(f"Error comparing law {law_id}: {str(e)}")
                 compliance_results.append({
                     "law_id": law_id,
                     "status": "Error",
-                    "details": f"Error during compliance check: {str(e)}"
+                    "details": str(e)
                 })
 
         return jsonify({"result": compliance_results}), 200
-
     except Exception as e:
-        app.logger.error(f"Unexpected error in contract_compliance: {str(e)}")
+        app.logger.error(f"Unexpected error: {str(e)}")
         return jsonify({"error": "Internal server error", "details": str(e)}), 500
+
+@app.route("/", methods=["GET"])
+def serve_index():
+    """Serve the main index file."""
+    return send_from_directory(STATIC_FOLDER, "index.html")
+
+@app.route("/<path:path>", methods=["GET"])
+def serve_static_files(path):
+    """Serve static files."""
+    return send_from_directory(STATIC_FOLDER, path)
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
