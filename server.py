@@ -12,7 +12,7 @@ import numpy as np
 import tiktoken
 import requests
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder="static")
 
 # Enable CORS
 CORS(app, resources={r"/api/*": {"origins": "*"}}, supports_credentials=True)
@@ -49,9 +49,6 @@ def decode_token(token):
         return None
 
 def fetch_law_from_mediawiki(law_title):
-    """
-    Fetches the content of a law from MediaWiki API by title.
-    """
     API_ENDPOINT = "https://he.wikisource.org/w/api.php"
     params = {
         "action": "query",
@@ -87,7 +84,6 @@ def load_laws(selected_laws):
 
 @app.route("/api/predefined-laws", methods=["GET"])
 def get_predefined_laws():
-    """API endpoint to retrieve predefined laws."""
     predefined_laws = {
         "1": "חוק מכר דירות 1973",
         "2": "חוק מכר דירות הבטחת השקעה 1974",
@@ -98,9 +94,7 @@ def get_predefined_laws():
 
 @app.route("/api/contract-compliance", methods=["POST"])
 def contract_compliance():
-    """Handles contract compliance checking."""
     try:
-        # Authorization and file validation
         token = request.headers.get("Authorization")
         if not token:
             return jsonify({"error": "Authorization token is missing"}), 401
@@ -121,45 +115,8 @@ def contract_compliance():
         file_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
         file.save(file_path)
 
-        # Read and decode the uploaded file
-        try:
-            with open(file_path, "rb") as f:
-                file_content = f.read()
-            try:
-                user_content = file_content.decode("utf-8")
-            except UnicodeDecodeError:
-                user_content = file_content.decode("iso-8859-1")
-        except Exception as e:
-            app.logger.error(f"Failed to read file: {str(e)}")
-            return jsonify({"error": f"Failed to read the uploaded file: {str(e)}"}), 500
-
-        # Process laws and compliance check
-        selected_law_ids = request.form.getlist("selected_laws")
-        predefined_laws = {
-            "1": "חוק מכר דירות 1973",
-            "2": "חוק מכר דירות הבטחת השקעה 1974",
-            "3": "חוק מכר דירות הבטחת השקעה תיקון מספר 9",
-            "4": "תקנות המכר (דירות) (הבטחת השקעות של רוכשי דירות) (סייג לתשלומים על חשבון מחיר דירה), -1975",
-        }
-        selected_laws = {law_id: predefined_laws[law_id] for law_id in selected_law_ids if law_id in predefined_laws}
-        laws = load_laws(selected_laws)
-        compliance_results = []
-
-        for law_id, law_text in laws.items():
-            try:
-                # Placeholder: Add logic for text comparison or compliance checks here.
-                compliance_results.append({
-                    "law_id": law_id,
-                    "status": "Compliant",
-                    "details": "Example compliance check passed."
-                })
-            except Exception as e:
-                compliance_results.append({
-                    "law_id": law_id,
-                    "status": "Error",
-                    "details": str(e)
-                })
-
+        # Simulated compliance check logic here
+        compliance_results = [{"law_id": "1", "status": "Compliant", "details": "Check passed"}]
         return jsonify({"result": compliance_results}), 200
     except Exception as e:
         app.logger.error(f"Unexpected error: {str(e)}")
@@ -167,12 +124,10 @@ def contract_compliance():
 
 @app.route("/", methods=["GET"])
 def serve_index():
-    """Serve the main index file."""
     return send_from_directory(".", "index.html")
 
-@app.route("/<path:path>", methods=["GET"])
+@app.route("/static/<path:path>", methods=["GET"])
 def serve_static_files(path):
-    """Serve static files."""
     return send_from_directory(STATIC_FOLDER, path)
 
 if __name__ == "__main__":
