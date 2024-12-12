@@ -16,20 +16,21 @@ document.addEventListener("DOMContentLoaded", () => {
     const fileInput = document.getElementById("file-input");
     const radioCohereChat = document.getElementById("radio-cohere-chat");
     const radioContractCompliance = document.getElementById("radio-contract-compliance");
-    const lawSelectionContainer = document.createElement("div");
-    
+    const contractComplianceSection = document.getElementById("contract-compliance-section");
+    const lawSelectionContainer = document.getElementById("law-selection");
+
     let isAuthenticated = false;
     let logoutTimer;
-
-    // Predefined laws fetched dynamically from the backend
     let laws = {};
 
+    // Fetch predefined laws from the backend
     async function fetchLaws() {
         try {
             const response = await fetch('/api/predefined-laws');
             const data = await response.json();
             if (response.ok && data.laws) {
                 laws = data.laws;
+                console.log("Fetched laws:", laws);
             } else {
                 console.error("Failed to fetch laws", data);
             }
@@ -38,6 +39,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
+    // Populate law selection dynamically
     async function populateLawOptions() {
         await fetchLaws();
         lawSelectionContainer.innerHTML = "<h3>Select Laws to Check:</h3>";
@@ -53,37 +55,49 @@ document.addEventListener("DOMContentLoaded", () => {
             lawSelectionContainer.appendChild(label);
             lawSelectionContainer.appendChild(document.createElement("br"));
         });
-        fileInput.parentElement.appendChild(lawSelectionContainer);
     }
 
-    // Helper to close all open popups
+    // Helper to close all popups
     const closeAllPopups = () => {
         signInPopup.classList.add("hidden");
         forgotPasswordPopup.classList.add("hidden");
     };
 
-    // Close Popup
+    // Close popups
     closeButtons.forEach((button) => {
         button.addEventListener("click", () => {
             button.closest(".popup").classList.add("hidden");
         });
     });
 
-    // Show Sign-In Popup
+    // Show sign-in popup
     signInLink.addEventListener("click", (e) => {
         e.preventDefault();
         closeAllPopups();
         signInPopup.classList.remove("hidden");
     });
 
-    // Show Forgot Password Popup
+    // Show forgot password popup
     forgotPasswordLink.addEventListener("click", (e) => {
         e.preventDefault();
         closeAllPopups();
         forgotPasswordPopup.classList.remove("hidden");
     });
 
-    // Handle Contract Compliance Submission
+    // Handle service selection
+    const handleServiceChange = () => {
+        if (radioContractCompliance.checked) {
+            contractComplianceSection.classList.remove("hidden");
+            populateLawOptions();
+        } else {
+            contractComplianceSection.classList.add("hidden");
+        }
+    };
+
+    radioCohereChat.addEventListener("change", handleServiceChange);
+    radioContractCompliance.addEventListener("change", handleServiceChange);
+
+    // Handle contract compliance submission
     cohereSendBtn.addEventListener("click", async () => {
         if (!isAuthenticated) {
             showFeedback("You must log in to use the service!", true);
@@ -122,18 +136,13 @@ document.addEventListener("DOMContentLoaded", () => {
                 });
 
                 const data = await response.json();
-                console.log("Server Response:", data);
                 if (response.ok) {
-                    if (Array.isArray(data.result)) {
-                        data.result.forEach((res) => {
-                            addMessage(
-                                "bot",
-                                `Law: ${laws[res.law_id]} - Status: ${res.status} - ${res.details || "No details"}`
-                            );
-                        });
-                    } else {
-                        addMessage("bot", `Unexpected response format: ${JSON.stringify(data.result)}`);
-                    }
+                    data.result.forEach((res) => {
+                        addMessage(
+                            "bot",
+                            `Law: ${laws[res.law_id]} - Status: ${res.status} - ${res.details || "No details"}`
+                        );
+                    });
                 } else {
                     addMessage("bot", data.error || "Error connecting to server.");
                 }
@@ -161,6 +170,6 @@ document.addEventListener("DOMContentLoaded", () => {
         }, 3000);
     };
 
-    // Initialize UI with laws on load
-    populateLawOptions();
+    // Initialize UI
+    handleServiceChange();
 });
