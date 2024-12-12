@@ -168,7 +168,7 @@ def contract_compliance():
 @app.route("/", methods=["GET"])
 def serve_index():
     """Serve the main index file."""
-    return send_from_directory(STATIC_FOLDER, "index.html")
+    return send_from_directory(".", "index.html")
 
 @app.route("/<path:path>", methods=["GET"])
 def serve_static_files(path):
