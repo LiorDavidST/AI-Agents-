@@ -12,7 +12,7 @@ import numpy as np
 import tiktoken
 import requests
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder='.', static_url_path='')  # Serve static files
 
 # Enable CORS
 CORS(app, resources={r"/api/*": {"origins": "*"}}, supports_credentials=True)
@@ -192,6 +192,18 @@ def contract_compliance():
     except Exception as e:
         app.logger.error(f"Unexpected error in contract_compliance: {str(e)}")
         return jsonify({"error": "Internal server error", "details": str(e)}), 500
+
+@app.route("/", methods=["GET"])
+def serve_index():
+    return send_from_directory(app.static_folder, "index.html")
+
+@app.route("/<path:path>", methods=["GET"])
+def serve_static_files(path):
+    try:
+        return send_from_directory(app.static_folder, path)
+    except Exception as e:
+        app.logger.error(f"File not found: {path} - {str(e)}")
+        return make_response(f"File not found: {path}", 404)
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
