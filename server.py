@@ -91,6 +91,45 @@ def chunk_text(text, max_tokens=512):
         chunks.append(tokenizer.decode(current_chunk))
 
     return chunks
+    
+    
+@app.route("/api/sign-in", methods=["POST"])
+def sign_in():
+    data = request.json
+    if not data or "email" not in data or "password" not in data:
+        return jsonify({"error": "Invalid input"}), 400
+
+    email = data["email"]
+    password = data["password"]
+
+    if len(password) < 8:
+        return jsonify({"error": "Password must be at least 8 characters"}), 400
+
+    if users_collection.find_one({"email": email}):
+        return jsonify({"error": f"The email '{email}' is already registered. Please log in or use a different email."}), 400
+
+    password_hash = generate_password_hash(password)
+    users_collection.insert_one({"email": email, "password_hash": password_hash})
+    return jsonify({"message": "Sign-up successful"}), 201
+
+@app.route("/api/login", methods=["POST"])
+def login():
+    data = request.json
+    if not data or "email" not in data or "password" not in data:
+        return jsonify({"error": "Invalid input"}), 400
+
+    email = data["email"]
+    password = data["password"]
+
+    user = users_collection.find_one({"email": email})
+    if not user:
+        return jsonify({"error": "Invalid email or password"}), 401
+
+    if check_password_hash(user["password_hash"], password):
+        token = generate_token(email)
+        return jsonify({"message": "Login successful", "token": token}), 200
+    else:
+        return jsonify({"error": "Invalid email or password"}), 401
 
 @app.route("/api/predefined-laws", methods=["GET"])
 def get_predefined_laws():
