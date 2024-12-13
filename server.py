@@ -49,44 +49,8 @@ def decode_token(token):
         return None
     except jwt.InvalidTokenError:
         return None
-        @app.route("/api/login", methods=["POST"])
-def login():
-    """
-    Handle user login by verifying email and password.
-    """
-    data = request.json
-    if not data or "email" not in data or "password" not in data:
-        return jsonify({"error": "Invalid input"}), 400
-
-    email = data["email"]
-    password = data["password"]
-
-    user = users_collection.find_one({"email": email})
-    if not user:
-        return jsonify({"error": "Invalid email or password"}), 401
-
-    if check_password_hash(user["password_hash"], password):
-        token = generate_token(email)
-        return jsonify({"message": "Login successful", "token": token}), 200
-    else:
-        return jsonify({"error": "Invalid email or password"}), 401
-
-@app.route("/", methods=["GET"])
-def serve_index():
-    return send_from_directory(app.static_folder, "index.html")
-
-@app.route("/<path:path>", methods=["GET"])
-def serve_static_files(path):
-    try:
-        return send_from_directory(app.static_folder, path)
-    except Exception as e:
-        app.logger.error(f"File not found: {path} - {str(e)}")
-        return make_response(f"File not found: {path}", 404)
-
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
         
+
 def fetch_law_from_mediawiki(law_title):
     """Fetch the content of a law from MediaWiki API by title."""
     params = {
