@@ -177,13 +177,68 @@ def contract_compliance():
         try:
             with open(file_path, "rb") as f:
                 file_content = f.read()
-            try:
-                user_content = file_content.decode("utf-8")
-            except UnicodeDecodeError:
-                user_content = file_content.decode("iso-8859-1")
+            user_content = file_content.decode("utf-8", errors="ignore")  # Always return a string
         except Exception as e:
             app.logger.error(f"Failed to read file: {str(e)}")
             return jsonify({"error": f"Failed to read the uploaded file: {str(e)}"}), 500
+
+        # Process laws and compliance check
+        selected_laws = request.form.getlist("selected_laws")
+        predefined_laws = {
+            "1": "חוק מכר דירות 1973",
+            "2": "חוק מכר דירות הבטחת השקעה 1974",
+            "3": "חוק מכר דירות הבטחת השקעה תיקון מספר 9",
+            "4": "תקנות המכר (דירות) (הבטחת השקעות של רוכשי דירות) (סייג לתשלומים על חשבון מחיר דירה), 1975",
+        }
+        laws = {law_id: fetch_law_from_mediawiki(predefined_laws[law_id])
+                for law_id in selected_laws if law_id in predefined_laws}
+
+        compliance_results = []
+
+        for law_id, law_text in laws.items():
+            if not isinstance(law_text, str) or not law_text.strip():
+                compliance_results.append({
+                    "law_id": law_id,
+                    "status": "Error",
+                    "details": "Law content is empty or invalid."
+                })
+                continue
+
+            try:
+                # Chunk the user content and law text
+                user_chunks = chunk_text(user_content, max_tokens=512)
+                law_chunks = chunk_text(law_text, max_tokens=512)
+
+                # Generate embeddings for all chunks
+                user_embeddings = co.embed(texts=user_chunks).embeddings
+                law_embeddings = co.embed(texts=law_chunks).embeddings
+
+                # Aggregate embeddings
+                user_vector = np.mean(user_embeddings, axis=0)
+                law_vector = np.mean(law_embeddings, axis=0)
+
+                # Compute cosine similarity
+                similarity = cosine_similarity([user_vector], [law_vector])[0][0]
+
+                compliance_results.append({
+                    "law_id": law_id,
+                    "status": "Compliant" if similarity > 0.8 else "Non-Compliant",
+                    "details": f"Similarity score: {similarity:.2f}"
+                })
+            except Exception as e:
+                app.logger.error(f"Error comparing law {law_id}: {str(e)}")
+                compliance_results.append({
+                    "law_id": law_id,
+                    "status": "Error",
+                    "details": f"Error during compliance check: {str(e)}"
+                })
+
+        return jsonify({"result": compliance_results}), 200
+
+    except Exception as e:
+        app.logger.error(f"Unexpected error in contract_compliance: {str(e)}")
+        return jsonify({"error": "Internal server error", "details": str(e)}), 500
+
 
         # Process laws and compliance check
         selected_laws = request.form.getlist("selected_laws")
