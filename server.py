@@ -11,6 +11,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
 import tiktoken
 import requests
+import urllib.parse
 
 app = Flask(__name__, static_folder='.', static_url_path='')  # Serve static files
 
@@ -53,10 +54,11 @@ def decode_token(token):
 
 def fetch_law_from_mediawiki(law_title):
     """Fetch the content of a law from MediaWiki API by title."""
+    encoded_title = urllib.parse.quote(law_title)  # Encode the title for URL safety
     params = {
         "action": "query",
         "prop": "revisions",
-        "titles": law_title,
+        "titles": encoded_title,  # Use the encoded title
         "rvslots": "*",
         "rvprop": "content",
         "format": "json",
@@ -148,6 +150,22 @@ def get_predefined_laws():
         else:
             app.logger.warning(f"Failed to fetch content for law: {law_title}")
     return jsonify({"laws": laws}), 200
+
+@app.route("/", methods=["GET"])
+def serve_index():
+    return send_from_directory(app.static_folder, "index.html")
+
+@app.route("/<path:path>", methods=["GET"])
+def serve_static_files(path):
+    try:
+        return send_from_directory(app.static_folder, path)
+    except Exception as e:
+        app.logger.error(f"File not found: {path} - {str(e)}")
+        return make_response(f"File not found: {path}", 404)
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
 
 @app.route("/api/contract-compliance", methods=["POST"])
 def contract_compliance():
