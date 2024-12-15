@@ -169,6 +169,7 @@ if __name__ == "__main__":
 
 @app.route("/api/contract-compliance", methods=["POST"])
 def contract_compliance():
+    print("Endpoint /api/contract-compliance was hit")
     try:
         # Authorization and file validation
         token = request.headers.get("Authorization")
