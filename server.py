@@ -49,8 +49,7 @@ def decode_token(token):
     except jwt.ExpiredSignatureError:
         return None
     except jwt.InvalidTokenError:
-        return None
-        
+        return None 
 
 def fetch_law_from_mediawiki(law_title):
     """Fetch the content of a law from MediaWiki API by title."""
@@ -67,14 +66,21 @@ def fetch_law_from_mediawiki(law_title):
         response = requests.get(MEDIAWIKI_API_URL, params=params)
         response.raise_for_status()
         data = response.json()
+
+        # Log the full response for debugging
+        app.logger.debug(f"MediaWiki response for '{law_title}': {data}")
+
         pages = data.get("query", {}).get("pages", {})
         for page_id, page_content in pages.items():
             if "revisions" in page_content:
                 return page_content["revisions"][0]["slots"]["main"]["*"]
+
+        # Log if no content is found
+        app.logger.warning(f"No content found for law title: {law_title}")
         return ""  # Return an empty string if no content is found
     except requests.RequestException as e:
         app.logger.error(f"Error fetching law '{law_title}': {str(e)}")
-        return ""  # Return an empty string to prevent NoneType errors
+        return ""  # Return an empty string to prevent crashes
 
 def chunk_text(text, max_tokens=512):
     """Split text into chunks of at most `max_tokens` tokens."""
@@ -193,6 +199,7 @@ def contract_compliance():
                 for law_id in selected_laws if law_id in predefined_laws}
 
         compliance_results = []
+        # Inserted for loop with provided code
         for law_id, law_text in laws.items():
             # Validate law_text
             if not isinstance(law_text, str) or not law_text.strip():
@@ -228,7 +235,6 @@ def contract_compliance():
     except Exception as e:
         app.logger.error(f"Unexpected error in contract_compliance: {str(e)}")
         return jsonify({"error": "Internal server error", "details": str(e)}), 500
-
         
 @app.route("/", methods=["GET"])
 def serve_index():
