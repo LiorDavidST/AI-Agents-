@@ -151,23 +151,10 @@ def get_predefined_laws():
             app.logger.warning(f"Failed to fetch content for law: {law_title}")
     return jsonify({"laws": laws}), 200
 
-@app.route("/", methods=["GET"])
-def serve_index():
-    return send_from_directory(app.static_folder, "index.html")
-
-@app.route("/<path:path>", methods=["GET"])
-def serve_static_files(path):
-    try:
-        return send_from_directory(app.static_folder, path)
-    except Exception as e:
-        app.logger.error(f"File not found: {path} - {str(e)}")
-        return make_response(f"File not found: {path}", 404)
-
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
-
 @app.route("/api/contract-compliance", methods=["POST"])
+def contract_compliance():
+    
+    @app.route("/api/contract-compliance", methods=["POST"])
 def contract_compliance():
     print("Endpoint /api/contract-compliance was hit")
     try:
@@ -306,19 +293,23 @@ def contract_compliance():
     except Exception as e:
         app.logger.error(f"Unexpected error in contract_compliance: {str(e)}")
         return jsonify({"error": "Internal server error", "details": str(e)}), 500
-
+        
 @app.route("/", methods=["GET"])
 def serve_index():
+    """Serve the main index.html file."""
     return send_from_directory(app.static_folder, "index.html")
 
 @app.route("/<path:path>", methods=["GET"])
 def serve_static_files(path):
+    """Serve other static files."""
     try:
         return send_from_directory(app.static_folder, path)
     except Exception as e:
         app.logger.error(f"File not found: {path} - {str(e)}")
         return make_response(f"File not found: {path}", 404)
 
+# Main entry point
 if __name__ == "__main__":
+    # Bind to dynamic PORT for Render deployment or default to 5000
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
