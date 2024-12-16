@@ -71,10 +71,10 @@ def fetch_law_from_mediawiki(law_title):
         for page_id, page_content in pages.items():
             if "revisions" in page_content:
                 return page_content["revisions"][0]["slots"]["main"]["*"]
-        return None
+        return ""  # Return an empty string if no content is found
     except requests.RequestException as e:
         app.logger.error(f"Error fetching law '{law_title}': {str(e)}")
-        return None
+        return ""  # Return an empty string to prevent NoneType errors
 
 def chunk_text(text, max_tokens=512):
     """Split text into chunks of at most `max_tokens` tokens."""
@@ -194,6 +194,15 @@ def contract_compliance():
 
         compliance_results = []
         for law_id, law_text in laws.items():
+            # Validate law_text
+            if not isinstance(law_text, str) or not law_text.strip():
+                compliance_results.append({
+                    "law_id": law_id,
+                    "status": "Error",
+                    "details": "Law content is empty or invalid."
+                })
+                continue  # Skip processing this law
+
             try:
                 user_chunks = chunk_text(user_content, max_tokens=512)
                 law_chunks = chunk_text(law_text, max_tokens=512)
