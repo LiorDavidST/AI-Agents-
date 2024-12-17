@@ -86,7 +86,7 @@ def fetch_law_from_mediawiki(law_title):
         return ""  # Return an empty string to prevent crashes
 
 def chunk_text(text, max_tokens=512):
-    """Split text into chunks of at most `max_tokens` tokens."""
+    """Split text into chunks with a hard limit on max tokens."""
     tokenizer = tiktoken.get_encoding("cl100k_base")
     tokens = tokenizer.encode(text)
     chunks = []
@@ -95,8 +95,8 @@ def chunk_text(text, max_tokens=512):
     for token in tokens:
         current_chunk.append(token)
         if len(current_chunk) >= max_tokens:
-            chunks.append(tokenizer.decode(current_chunk))
-            current_chunk = []
+            chunks.append(tokenizer.decode(current_chunk[:max_tokens]))
+            current_chunk = current_chunk[max_tokens:]  # Carry over remaining tokens
 
     if current_chunk:
         chunks.append(tokenizer.decode(current_chunk))
