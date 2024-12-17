@@ -202,9 +202,9 @@ def contract_compliance():
                 for law_id in selected_laws if law_id in predefined_laws}
 
         compliance_results = []
-        # Inserted for loop with provided code
+
+        # Compare each law to user content
         for law_id, law_text in laws.items():
-            # Validate law_text
             if not isinstance(law_text, str) or not law_text.strip():
                 compliance_results.append({
                     "law_id": law_id,
@@ -214,13 +214,22 @@ def contract_compliance():
                 continue  # Skip processing this law
 
             try:
+                # Split texts into chunks
                 user_chunks = chunk_text(user_content, max_tokens=512)
                 law_chunks = chunk_text(law_text, max_tokens=512)
+
+                # Generate embeddings for chunks
                 user_embeddings = co.embed(texts=user_chunks).embeddings
                 law_embeddings = co.embed(texts=law_chunks).embeddings
+
+                # Compute mean vectors
                 user_vector = np.mean(user_embeddings, axis=0)
                 law_vector = np.mean(law_embeddings, axis=0)
+
+                # Compute cosine similarity
                 similarity = cosine_similarity([user_vector], [law_vector])[0][0]
+
+                # Append result
                 compliance_results.append({
                     "law_id": law_id,
                     "status": "Compliant" if similarity > 0.8 else "Non-Compliant",
