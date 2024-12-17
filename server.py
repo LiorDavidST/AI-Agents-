@@ -12,6 +12,7 @@ import numpy as np
 import tiktoken
 import requests
 import urllib.parse
+from bs4 import BeautifulSoup
 
 app = Flask(__name__, static_folder='.', static_url_path='')  # Serve static files
 
@@ -51,15 +52,14 @@ def decode_token(token):
     except jwt.InvalidTokenError:
         return None 
 
+from bs4 import BeautifulSoup
+
 def fetch_law_from_mediawiki(law_title):
     """Fetch the content of a law from MediaWiki API by title."""
-    encoded_title = urllib.parse.quote(law_title)  # Encode the title for URL safety
     params = {
-        "action": "query",
-        "prop": "revisions",
-        "titles": encoded_title,  # Use the encoded title
-        "rvslots": "*",
-        "rvprop": "content",
+        "action": "parse",  # שינוי הפעולה ל-parse
+        "page": law_title,  # שימוש בשם החוק
+        "prop": "text",  # שליפת התוכן בפורמט HTML
         "format": "json",
     }
     try:
@@ -70,14 +70,17 @@ def fetch_law_from_mediawiki(law_title):
         # Log the full response for debugging
         app.logger.debug(f"MediaWiki response for '{law_title}': {data}")
 
-        pages = data.get("query", {}).get("pages", {})
-        for page_id, page_content in pages.items():
-            if "revisions" in page_content:
-                return page_content["revisions"][0]["slots"]["main"]["*"]
+        # שליפת ה-HTML מהשדה text
+        html_content = data.get("parse", {}).get("text", {}).get("*", "")
+        if not html_content:
+            app.logger.warning(f"No content found for law title: {law_title}")
+            return ""
 
-        # Log if no content is found
-        app.logger.warning(f"No content found for law title: {law_title}")
-        return ""  # Return an empty string if no content is found
+        # שימוש ב-BeautifulSoup לניקוי ה-HTML
+        soup = BeautifulSoup(html_content, "html.parser")
+        law_text = soup.get_text(separator="\n", strip=True)
+
+        return law_text
     except requests.RequestException as e:
         app.logger.error(f"Error fetching law '{law_title}': {str(e)}")
         return ""  # Return an empty string to prevent crashes
