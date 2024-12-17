@@ -190,7 +190,7 @@ def contract_compliance():
         # Process laws and compliance check
         selected_laws = request.form.getlist("selected_laws")
         predefined_laws = {
-            "1": "חוק מכר דירות 1973",
+            "1": "חוק המכר",
             "2": "חוק מכר דירות הבטחת השקעה 1974",
             "3": "חוק מכר דירות הבטחת השקעה תיקון מספר 9",
             "4": "תקנות המכר (דירות) (הבטחת השקעות של רוכשי דירות) (סייג לתשלומים על חשבון מחיר דירה), 1975",
