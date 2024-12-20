@@ -91,10 +91,26 @@ def chunk_text(text, max_tokens=512):
     tokens = tokenizer.encode(text)
     chunks = []
 
+    app.logger.debug(f"Total tokens in input text: {len(tokens)}")
+
     # Process tokens in slices of max_tokens size
     for i in range(0, len(tokens), max_tokens):
         chunk = tokens[i:i + max_tokens]
-        chunks.append(tokenizer.decode(chunk))  # Decode the current chunk
+        decoded_chunk = tokenizer.decode(chunk)
+        
+        # Re-encode to ensure token count is within the limit
+        while len(tokenizer.encode(decoded_chunk)) > max_tokens:
+            midpoint = len(decoded_chunk) // 2
+            chunk_a = decoded_chunk[:midpoint]
+            chunk_b = decoded_chunk[midpoint:]
+            chunks.append(chunk_a)
+            decoded_chunk = chunk_b
+
+        chunks.append(decoded_chunk)
+
+    app.logger.debug(f"Generated {len(chunks)} chunks:")
+    for i, chunk in enumerate(chunks):
+        app.logger.debug(f"  Chunk {i + 1}: {len(tokenizer.encode(chunk))} tokens")
 
     return chunks
     
