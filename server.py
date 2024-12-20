@@ -90,19 +90,13 @@ def chunk_text(text, max_tokens=512):
     tokenizer = tiktoken.get_encoding("cl100k_base")
     tokens = tokenizer.encode(text)
     chunks = []
-    current_chunk = []
 
-    for token in tokens:
-        current_chunk.append(token)
-        if len(current_chunk) >= max_tokens:
-            chunks.append(tokenizer.decode(current_chunk[:max_tokens]))
-            current_chunk = current_chunk[max_tokens:]  # Carry over remaining tokens
-
-    if current_chunk:
-        chunks.append(tokenizer.decode(current_chunk))
+    # Process tokens in slices of max_tokens size
+    for i in range(0, len(tokens), max_tokens):
+        chunk = tokens[i:i + max_tokens]
+        chunks.append(tokenizer.decode(chunk))  # Decode the current chunk
 
     return chunks
-    
     
 @app.route("/api/sign-in", methods=["POST"])
 def sign_in():
@@ -215,8 +209,8 @@ def contract_compliance():
 
             try:
                 # Split texts into chunks
-                user_chunks = chunk_text(user_content, max_tokens=512)
-                law_chunks = chunk_text(law_text, max_tokens=512)
+                user_chunks = chunk_text(user_content, max_tokens=500)
+                law_chunks = chunk_text(law_text, max_tokens=500)
 
                 # Debug: Log chunk counts and token lengths
                 app.logger.debug(f"Processing law ID {law_id}:")
