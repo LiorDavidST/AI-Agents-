@@ -228,10 +228,24 @@ def contract_compliance():
                 user_chunks = chunk_text(user_content, max_tokens=500)
                 law_chunks = chunk_text(law_text, max_tokens=500)
 
-                # Debug: Log chunk counts and token lengths
+                # Debug: Log chunk counts and validate sizes
                 app.logger.debug(f"Processing law ID {law_id}:")
                 app.logger.debug(f"  User chunks: {len(user_chunks)} chunks")
                 app.logger.debug(f"  Law chunks: {len(law_chunks)} chunks")
+
+                app.logger.debug(f"Validating user chunks (total: {len(user_chunks)})...")
+                for i, chunk in enumerate(user_chunks):
+                    token_count = len(tiktoken.get_encoding("cl100k_base").encode(chunk))
+                    app.logger.debug(f"  User chunk {i}: {token_count} tokens")
+                    if token_count > 512:
+                        app.logger.error(f"User chunk {i} exceeds max tokens: {token_count} tokens")
+
+                app.logger.debug(f"Validating law chunks (total: {len(law_chunks)})...")
+                for i, chunk in enumerate(law_chunks):
+                    token_count = len(tiktoken.get_encoding("cl100k_base").encode(chunk))
+                    app.logger.debug(f"  Law chunk {i}: {token_count} tokens")
+                    if token_count > 512:
+                        app.logger.error(f"Law chunk {i} exceeds max tokens: {token_count} tokens")
 
                 # Generate embeddings for chunks
                 try:
