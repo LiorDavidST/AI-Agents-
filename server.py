@@ -218,9 +218,23 @@ def contract_compliance():
                 user_chunks = chunk_text(user_content, max_tokens=512)
                 law_chunks = chunk_text(law_text, max_tokens=512)
 
+                # Debug: Log chunk counts and token lengths
+                app.logger.debug(f"Processing law ID {law_id}:")
+                app.logger.debug(f"  User chunks: {len(user_chunks)} chunks")
+                app.logger.debug(f"  Law chunks: {len(law_chunks)} chunks")
+
                 # Generate embeddings for chunks
-                user_embeddings = co.embed(texts=user_chunks).embeddings
-                law_embeddings = co.embed(texts=law_chunks).embeddings
+                try:
+                    user_embeddings = co.embed(texts=user_chunks).embeddings
+                    law_embeddings = co.embed(texts=law_chunks).embeddings
+                except Exception as e:
+                    app.logger.error(f"Error embedding text for law {law_id}: {str(e)}")
+                    compliance_results.append({
+                        "law_id": law_id,
+                        "status": "Error",
+                        "details": "Error generating embeddings."
+                    })
+                    continue  # Skip further processing for this law
 
                 # Compute mean vectors
                 user_vector = np.mean(user_embeddings, axis=0)
@@ -247,6 +261,7 @@ def contract_compliance():
     except Exception as e:
         app.logger.error(f"Unexpected error in contract_compliance: {str(e)}")
         return jsonify({"error": "Internal server error", "details": str(e)}), 500
+
         
 @app.route("/", methods=["GET"])
 def serve_index():
