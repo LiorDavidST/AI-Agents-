@@ -13,6 +13,7 @@ import tiktoken
 import requests
 import urllib.parse
 from bs4 import BeautifulSoup
+import time
 
 app = Flask(__name__, static_folder='.', static_url_path='')  # Serve static files
 
@@ -101,8 +102,8 @@ def fetch_law_from_mediawiki(law_title):
         app.logger.error(f"Unexpected error processing law '{law_title}': {str(e)}")
         return ""  # Handle unexpected errors gracefully
 
-def chunk_text(text, max_tokens=512):
-    """Split text into chunks with a strict limit on max tokens."""
+def chunk_text(text, max_tokens=512, max_total_tokens=20000):
+    """Split text into chunks with a strict limit on max tokens and truncate if necessary."""
     tokenizer = tiktoken.get_encoding("cl100k_base")
 
     # Handle empty input text
@@ -112,28 +113,32 @@ def chunk_text(text, max_tokens=512):
 
     # Encode the input text into tokens
     tokens = tokenizer.encode(text)
-    chunks = []
+    total_token_count = len(tokens)
 
-    # Log the total number of tokens in the input text
-    app.logger.debug(f"Total tokens in input text: {len(tokens)}")
+    # Truncate tokens if they exceed the maximum allowed
+    if total_token_count > max_total_tokens:
+        app.logger.warning(f"Input text exceeds {max_total_tokens} tokens. Truncating to {max_total_tokens} tokens.")
+        tokens = tokens[:max_total_tokens]
+        total_token_count = len(tokens)
+
+    # Log the total number of tokens after truncation
+    app.logger.debug(f"Total tokens after truncation (if applied): {total_token_count}")
 
     # Process tokens in slices of max_tokens size
-    for i in range(0, len(tokens), max_tokens):
+    chunks = []
+    for i in range(0, total_token_count, max_tokens):
         chunk = tokens[i:i + max_tokens]
         decoded_chunk = tokenizer.decode(chunk)
 
-        # Check and split oversized chunks
+        # Validate chunk size and split oversized chunks if necessary
         token_count = len(tokenizer.encode(decoded_chunk))
-        if token_count > max_tokens:
-            while token_count > max_tokens:
-                # Split the chunk into two smaller parts
-                midpoint = len(decoded_chunk) // 2
-                chunk_a = decoded_chunk[:midpoint]
-                chunk_b = decoded_chunk[midpoint:]
-                chunks.append(chunk_a)
-                decoded_chunk = chunk_b
-                # Update the token count for the remaining chunk
-                token_count = len(tokenizer.encode(decoded_chunk))
+        while token_count > max_tokens:
+            midpoint = len(decoded_chunk) // 2
+            chunk_a = decoded_chunk[:midpoint]
+            chunk_b = decoded_chunk[midpoint:]
+            chunks.append(chunk_a)
+            decoded_chunk = chunk_b
+            token_count = len(tokenizer.encode(decoded_chunk))
 
         # Append the final valid chunk
         chunks.append(decoded_chunk)
@@ -144,17 +149,39 @@ def chunk_text(text, max_tokens=512):
         app.logger.debug(f"  Chunk {i + 1}: {len(tokenizer.encode(chunk))} tokens")
 
     return chunks
-def batch_embeddings(chunks, batch_size=10):
-    """Generate embeddings in batches to avoid API limits."""
+
+
+def batch_embeddings(chunks, batch_size=5):
+    """Generate embeddings in batches with validation and rate limiting."""
     embeddings = []
+    tokenizer = tiktoken.get_encoding("cl100k_base")
+
     for i in range(0, len(chunks), batch_size):
         batch = chunks[i:i + batch_size]
+        validated_batch = []
+
+        for chunk in batch:
+            token_count = len(tokenizer.encode(chunk))
+            if token_count > 512:
+                app.logger.error(f"Chunk exceeds 512 tokens and will be skipped: {token_count} tokens")
+            else:
+                validated_batch.append(chunk)
+
+        if not validated_batch:
+            app.logger.warning(f"All chunks in batch {i // batch_size} are invalid.")
+            continue
+
         try:
-            response = co.embed(texts=batch).embeddings
+            response = co.embed(texts=validated_batch).embeddings
             embeddings.extend(response)
         except Exception as e:
             app.logger.error(f"Error embedding batch {i // batch_size}: {str(e)}")
+
+        # Rate limiting: Add a delay between batches
+        time.sleep(1.5)  # Adjust based on API rate limits
+
     return embeddings
+
     
 @app.route("/api/sign-in", methods=["POST"])
 def sign_in():
@@ -284,9 +311,16 @@ def contract_compliance():
                 user_embeddings = batch_embeddings(user_chunks, batch_size=10)
                 law_embeddings = batch_embeddings(law_chunks, batch_size=10)
 
+                # Check if embeddings are valid
+                if not user_embeddings or not law_embeddings:
+                    raise ValueError("No valid embeddings were generated for user or law content.")
+
                 # Compute mean vectors
-                user_vector = np.mean(user_embeddings, axis=0)
-                law_vector = np.mean(law_embeddings, axis=0)
+                user_vector = np.mean(user_embeddings, axis=0) if user_embeddings else None
+                law_vector = np.mean(law_embeddings, axis=0) if law_embeddings else None
+
+                if user_vector is None or law_vector is None:
+                    raise ValueError("Mean vectors could not be computed due to empty embeddings.")
 
                 # Compute cosine similarity
                 similarity = cosine_similarity([user_vector], [law_vector])[0][0]
@@ -322,6 +356,7 @@ def contract_compliance():
         # Ensure the uploaded file is cleaned up
         if os.path.exists(file_path):
             os.remove(file_path)
+
 
 @app.route("/", methods=["GET"])
 def serve_index():
