@@ -84,8 +84,12 @@ def fetch_law_from_mediawiki(law_title):
         # Validate the size of the retrieved content
         token_count = len(tiktoken.get_encoding("cl100k_base").encode(law_text))
         if token_count > 5000:  # Arbitrary size limit for validation
-            app.logger.warning(f"Retrieved law text for '{law_title}' is too long ({token_count} tokens).")
-            return ""
+            app.logger.warning(f"Retrieved law text for '{law_title}' is too long ({token_count} tokens). Truncating.")
+
+            # Truncate the text to 5000 tokens
+            tokens = tiktoken.get_encoding("cl100k_base").encode(law_text)[:5000]
+            law_text = tiktoken.get_encoding("cl100k_base").decode(tokens)
+            app.logger.debug(f"Truncated law text to 5000 tokens.")
 
         return law_text
 
@@ -96,7 +100,6 @@ def fetch_law_from_mediawiki(law_title):
     except Exception as e:
         app.logger.error(f"Unexpected error processing law '{law_title}': {str(e)}")
         return ""  # Handle unexpected errors gracefully
-
 
 def chunk_text(text, max_tokens=512):
     """Split text into chunks with a strict limit on max tokens."""
