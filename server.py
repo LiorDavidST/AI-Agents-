@@ -57,62 +57,101 @@ from bs4 import BeautifulSoup
 def fetch_law_from_mediawiki(law_title):
     """Fetch the content of a law from MediaWiki API by title."""
     params = {
-        "action": "parse",  # שינוי הפעולה ל-parse
-        "page": law_title,  # שימוש בשם החוק
-        "prop": "text",  # שליפת התוכן בפורמט HTML
+        "action": "parse",  # API action to parse a page
+        "page": law_title,  # Law title to fetch
+        "prop": "text",     # Retrieve content in HTML format
         "format": "json",
     }
     try:
+        # Fetch the law from MediaWiki API
         response = requests.get(MEDIAWIKI_API_URL, params=params)
         response.raise_for_status()
         data = response.json()
 
-        # Log the full response for debugging
+        # Log the raw API response for debugging
         app.logger.debug(f"MediaWiki response for '{law_title}': {data}")
 
-        # שליפת ה-HTML מהשדה text
+        # Extract HTML content from the response
         html_content = data.get("parse", {}).get("text", {}).get("*", "")
         if not html_content:
             app.logger.warning(f"No content found for law title: {law_title}")
             return ""
 
-        # שימוש ב-BeautifulSoup לניקוי ה-HTML
+        # Clean the HTML content using BeautifulSoup
         soup = BeautifulSoup(html_content, "html.parser")
         law_text = soup.get_text(separator="\n", strip=True)
 
+        # Validate the size of the retrieved content
+        token_count = len(tiktoken.get_encoding("cl100k_base").encode(law_text))
+        if token_count > 5000:  # Arbitrary size limit for validation
+            app.logger.warning(f"Retrieved law text for '{law_title}' is too long ({token_count} tokens).")
+            return ""
+
         return law_text
+
     except requests.RequestException as e:
         app.logger.error(f"Error fetching law '{law_title}': {str(e)}")
         return ""  # Return an empty string to prevent crashes
 
+    except Exception as e:
+        app.logger.error(f"Unexpected error processing law '{law_title}': {str(e)}")
+        return ""  # Handle unexpected errors gracefully
+
+
 def chunk_text(text, max_tokens=512):
-    """Split text into chunks with a hard limit on max tokens."""
+    """Split text into chunks with a strict limit on max tokens."""
     tokenizer = tiktoken.get_encoding("cl100k_base")
+
+    # Handle empty input text
+    if not text.strip():
+        app.logger.debug("Input text is empty. Returning no chunks.")
+        return []
+
+    # Encode the input text into tokens
     tokens = tokenizer.encode(text)
     chunks = []
 
+    # Log the total number of tokens in the input text
     app.logger.debug(f"Total tokens in input text: {len(tokens)}")
 
     # Process tokens in slices of max_tokens size
     for i in range(0, len(tokens), max_tokens):
         chunk = tokens[i:i + max_tokens]
         decoded_chunk = tokenizer.decode(chunk)
-        
-        # Re-encode to ensure token count is within the limit
-        while len(tokenizer.encode(decoded_chunk)) > max_tokens:
-            midpoint = len(decoded_chunk) // 2
-            chunk_a = decoded_chunk[:midpoint]
-            chunk_b = decoded_chunk[midpoint:]
-            chunks.append(chunk_a)
-            decoded_chunk = chunk_b
 
+        # Check and split oversized chunks
+        token_count = len(tokenizer.encode(decoded_chunk))
+        if token_count > max_tokens:
+            while token_count > max_tokens:
+                # Split the chunk into two smaller parts
+                midpoint = len(decoded_chunk) // 2
+                chunk_a = decoded_chunk[:midpoint]
+                chunk_b = decoded_chunk[midpoint:]
+                chunks.append(chunk_a)
+                decoded_chunk = chunk_b
+                # Update the token count for the remaining chunk
+                token_count = len(tokenizer.encode(decoded_chunk))
+
+        # Append the final valid chunk
         chunks.append(decoded_chunk)
 
+    # Log the details of generated chunks
     app.logger.debug(f"Generated {len(chunks)} chunks:")
     for i, chunk in enumerate(chunks):
         app.logger.debug(f"  Chunk {i + 1}: {len(tokenizer.encode(chunk))} tokens")
 
     return chunks
+def batch_embeddings(chunks, batch_size=10):
+    """Generate embeddings in batches to avoid API limits."""
+    embeddings = []
+    for i in range(0, len(chunks), batch_size):
+        batch = chunks[i:i + batch_size]
+        try:
+            response = co.embed(texts=batch).embeddings
+            embeddings.extend(response)
+        except Exception as e:
+            app.logger.error(f"Error embedding batch {i // batch_size}: {str(e)}")
+    return embeddings
     
 @app.route("/api/sign-in", methods=["POST"])
 def sign_in():
@@ -228,37 +267,19 @@ def contract_compliance():
                 user_chunks = chunk_text(user_content, max_tokens=500)
                 law_chunks = chunk_text(law_text, max_tokens=500)
 
-                # Debug: Log chunk counts and validate sizes
-                app.logger.debug(f"Processing law ID {law_id}:")
-                app.logger.debug(f"  User chunks: {len(user_chunks)} chunks")
-                app.logger.debug(f"  Law chunks: {len(law_chunks)} chunks")
-
-                app.logger.debug(f"Validating user chunks (total: {len(user_chunks)})...")
+                # Validate chunks
                 for i, chunk in enumerate(user_chunks):
                     token_count = len(tiktoken.get_encoding("cl100k_base").encode(chunk))
-                    app.logger.debug(f"  User chunk {i}: {token_count} tokens")
                     if token_count > 512:
-                        app.logger.error(f"User chunk {i} exceeds max tokens: {token_count} tokens")
-
-                app.logger.debug(f"Validating law chunks (total: {len(law_chunks)})...")
+                        raise ValueError(f"User chunk {i + 1} exceeds max tokens: {token_count}")
                 for i, chunk in enumerate(law_chunks):
                     token_count = len(tiktoken.get_encoding("cl100k_base").encode(chunk))
-                    app.logger.debug(f"  Law chunk {i}: {token_count} tokens")
                     if token_count > 512:
-                        app.logger.error(f"Law chunk {i} exceeds max tokens: {token_count} tokens")
+                        raise ValueError(f"Law chunk {i + 1} exceeds max tokens: {token_count}")
 
-                # Generate embeddings for chunks
-                try:
-                    user_embeddings = co.embed(texts=user_chunks).embeddings
-                    law_embeddings = co.embed(texts=law_chunks).embeddings
-                except Exception as e:
-                    app.logger.error(f"Error embedding text for law {law_id}: {str(e)}")
-                    compliance_results.append({
-                        "law_id": law_id,
-                        "status": "Error",
-                        "details": "Error generating embeddings."
-                    })
-                    continue  # Skip further processing for this law
+                # Generate embeddings with batching
+                user_embeddings = batch_embeddings(user_chunks, batch_size=10)
+                law_embeddings = batch_embeddings(law_chunks, batch_size=10)
 
                 # Compute mean vectors
                 user_vector = np.mean(user_embeddings, axis=0)
@@ -273,6 +294,13 @@ def contract_compliance():
                     "status": "Compliant" if similarity > 0.8 else "Non-Compliant",
                     "details": f"Similarity score: {similarity:.2f}"
                 })
+            except ValueError as ve:
+                app.logger.error(f"Validation error for law {law_id}: {str(ve)}")
+                compliance_results.append({
+                    "law_id": law_id,
+                    "status": "Error",
+                    "details": str(ve)
+                })
             except Exception as e:
                 app.logger.error(f"Error comparing law {law_id}: {str(e)}")
                 compliance_results.append({
@@ -282,11 +310,16 @@ def contract_compliance():
                 })
 
         return jsonify({"result": compliance_results}), 200
+
     except Exception as e:
         app.logger.error(f"Unexpected error in contract_compliance: {str(e)}")
         return jsonify({"error": "Internal server error", "details": str(e)}), 500
 
-        
+    finally:
+        # Ensure the uploaded file is cleaned up
+        if os.path.exists(file_path):
+            os.remove(file_path)
+
 @app.route("/", methods=["GET"])
 def serve_index():
     """Serve the main index.html file."""
