@@ -130,9 +130,10 @@ def chunk_text(text, max_tokens=512, max_total_tokens=20000):
         chunk = tokens[i:i + max_tokens]
         decoded_chunk = tokenizer.decode(chunk)
 
-        # Validate chunk size and split oversized chunks if necessary
+        # Revalidate and split oversized chunks
         token_count = len(tokenizer.encode(decoded_chunk))
         while token_count > max_tokens:
+            app.logger.warning(f"Chunk exceeds {max_tokens} tokens. Splitting further.")
             midpoint = len(decoded_chunk) // 2
             chunk_a = decoded_chunk[:midpoint]
             chunk_b = decoded_chunk[midpoint:]
@@ -149,6 +150,7 @@ def chunk_text(text, max_tokens=512, max_total_tokens=20000):
         app.logger.debug(f"  Chunk {i + 1}: {len(tokenizer.encode(chunk))} tokens")
 
     return chunks
+
 
 
 def batch_embeddings(chunks, batch_size=5):
@@ -181,8 +183,7 @@ def batch_embeddings(chunks, batch_size=5):
         time.sleep(1.5)  # Adjust based on API rate limits
 
     return embeddings
-
-    
+  
 @app.route("/api/sign-in", methods=["POST"])
 def sign_in():
     data = request.json
