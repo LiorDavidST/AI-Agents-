@@ -224,21 +224,41 @@ def login():
 
 @app.route("/api/predefined-laws", methods=["GET"])
 def get_predefined_laws():
-    """Fetch predefined laws from MediaWiki and return as JSON."""
+    """Return predefined law titles."""
+    predefined_laws = {
+        "1": "חוק המכר (דירות)",
+        "2": "חוק מכר דירות הבטחת השקעה 1974",
+        "3": "חוק מכר דירות הבטחת השקעה תיקון מספר 9",
+        "4": "תקנות המכר (דירות) (הבטחת השקעות של רוכשי דירות) (סייג לתשלומים על חשבון מחיר דירה), 1975",
+    }
+    return jsonify(predefined_laws), 200
+
+@app.route("/api/fetch-law-text", methods=["POST"])
+def fetch_law_text():
+    """Fetch the full law text by ID."""
+    data = request.json
+    if "law_id" not in data:
+        return jsonify({"error": "law_id is required"}), 400
+
+    law_id = data["law_id"]
     predefined_laws = {
         "1": "חוק_המכר_(דירות)",
         "2": "חוק מכר דירות הבטחת השקעה 1974",
         "3": "חוק מכר דירות הבטחת השקעה תיקון מספר 9",
         "4": "תקנות המכר (דירות) (הבטחת השקעות של רוכשי דירות) (סייג לתשלומים על חשבון מחיר דירה), 1975",
     }
-    laws = {}
-    for law_id, law_title in predefined_laws.items():
-        law_content = fetch_law_from_mediawiki(law_title)
-        if law_content:
-            laws[law_id] = law_content
-        else:
-            app.logger.warning(f"Failed to fetch content for law: {law_title}")
-    return jsonify({"laws": laws}), 200
+
+    if law_id not in predefined_laws:
+        return jsonify({"error": "Invalid law ID"}), 400
+
+    law_title = predefined_laws[law_id]
+    law_text = fetch_law_from_mediawiki(law_title)
+
+    if not law_text:
+        return jsonify({"error": "Unable to fetch law text"}), 500
+
+    return jsonify({"law_id": law_id, "law_title": law_title, "law_text": law_text}), 200
+
 
 @app.route("/api/contract-compliance", methods=["POST"])
 def contract_compliance():
