@@ -239,6 +239,24 @@ body {
     white-space: nowrap;
 }
 
+/* Law Selection */
+#law-selection {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.law-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.law-item input[type="checkbox"] {
+    accent-color: var(--primary-color);
+}
+
 textarea {
     flex: 1;
     padding: 10px;

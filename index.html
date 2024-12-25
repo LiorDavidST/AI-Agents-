@@ -65,9 +65,7 @@
                 <!-- Left Section: Chat Display -->
                 <div class="chat-left">
                     <h2>Welcome to AI LAW SERVICES! Start your conversation or upload a file.</h2>
-                    <div id="cohere-chat-body" class="chat-body">
-                      
-                    </div>
+                    <div id="cohere-chat-body" class="chat-body"></div>
                 </div>
                 <!-- Right Section: Inputs and Controls -->
                 <div class="chat-right">
@@ -86,7 +84,7 @@
                         <h4>Upload Contract and Select Laws</h4>
                         <label for="file-input">Upload Contract File:</label>
                         <input type="file" id="file-input" accept=".txt,.doc,.docx,.pdf">
-                        
+
                         <h4>Select Laws to Compare:</h4>
                         <div id="law-selection">
                             <!-- Laws dynamically loaded via JS -->
@@ -117,6 +115,44 @@
         </table>
     </div>
 
-    <script src="script.js"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            const lawSelectionContainer = document.getElementById("law-selection");
+
+            // Function to fetch and populate laws
+            const fetchLaws = async () => {
+                try {
+                    const response = await fetch("/api/predefined-laws");
+                    const laws = await response.json();
+
+                    // Clear existing content in the law selection container
+                    lawSelectionContainer.innerHTML = "<h4>Select Laws to Compare:</h4>";
+
+                    Object.entries(laws).forEach(([id, title]) => {
+                        const checkbox = document.createElement("input");
+                        checkbox.type = "checkbox";
+                        checkbox.id = `law-${id}`;
+                        checkbox.value = id;
+
+                        const label = document.createElement("label");
+                        label.htmlFor = `law-${id}`;
+                        label.textContent = title;
+
+                        const container = document.createElement("div");
+                        container.className = "law-item";
+                        container.appendChild(checkbox);
+                        container.appendChild(label);
+
+                        lawSelectionContainer.appendChild(container);
+                    });
+                } catch (error) {
+                    console.error("Error fetching laws:", error);
+                }
+            };
+
+            // Ensure the function is invoked
+            fetchLaws();
+        });
+    </script>
 </body>
 </html>

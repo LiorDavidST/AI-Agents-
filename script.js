@@ -51,13 +51,18 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     // Fetch predefined laws from the backend
+document.addEventListener("DOMContentLoaded", () => {
+    const lawSelectionContainer = document.getElementById("law-selection");
+
+    // Function to fetch and populate laws
     const fetchLaws = async () => {
         try {
             const response = await fetch("/api/predefined-laws");
             const laws = await response.json();
 
-            // Clear existing laws and populate the container
+            // Clear existing content in the law selection container
             lawSelectionContainer.innerHTML = "<h4>Select Laws to Compare:</h4>";
+
             Object.entries(laws).forEach(([id, title]) => {
                 const checkbox = document.createElement("input");
                 checkbox.type = "checkbox";
@@ -69,6 +74,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 label.textContent = title;
 
                 const container = document.createElement("div");
+                container.className = "law-item";
                 container.appendChild(checkbox);
                 container.appendChild(label);
 
@@ -76,12 +82,13 @@ document.addEventListener("DOMContentLoaded", () => {
             });
         } catch (error) {
             console.error("Error fetching laws:", error);
-            showFeedback("Failed to load laws. Please try again.", true);
         }
     };
 
-    // Fetch laws when the page loads
+    // Ensure the function is invoked
     fetchLaws();
+});
+
 
     // Handle Sign-In Form Submission
     signInForm.addEventListener("submit", async (e) => {
