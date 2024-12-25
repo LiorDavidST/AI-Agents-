@@ -19,6 +19,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const lawSelectionContainer = document.getElementById("law-selection");
     const resultsTableBody = document.getElementById("results-table-body");
     const complianceResultsContainer = document.getElementById("compliance-results");
+    const contractComplianceSection = document.getElementById("contract-compliance-section");
 
     let isAuthenticated = false;
     let logoutTimer;
@@ -50,28 +51,24 @@ document.addEventListener("DOMContentLoaded", () => {
         forgotPasswordPopup.classList.remove("hidden");
     });
 
-    // Fetch predefined laws from the backend
-document.addEventListener("DOMContentLoaded", () => {
-    const lawSelectionContainer = document.getElementById("law-selection");
-
-    // Function to fetch and populate laws
+    // Fetch predefined laws dynamically
     const fetchLaws = async () => {
         try {
             const response = await fetch("/api/predefined-laws");
-            const laws = await response.json();
+            const data = await response.json();
+            const laws = data.laws;
 
-            // Clear existing content in the law selection container
-            lawSelectionContainer.innerHTML = "<h4>Select Laws to Compare:</h4>";
+            lawSelectionContainer.innerHTML = ""; // Clear existing content
 
-            Object.entries(laws).forEach(([id, title]) => {
+            Object.entries(laws).forEach(([lawId, lawTitle]) => {
                 const checkbox = document.createElement("input");
                 checkbox.type = "checkbox";
-                checkbox.id = `law-${id}`;
-                checkbox.value = id;
+                checkbox.id = `law-${lawId}`;
+                checkbox.value = lawId;
 
                 const label = document.createElement("label");
-                label.htmlFor = `law-${id}`;
-                label.textContent = title;
+                label.setAttribute("for", `law-${lawId}`);
+                label.textContent = lawTitle;
 
                 const container = document.createElement("div");
                 container.className = "law-item";
@@ -82,13 +79,19 @@ document.addEventListener("DOMContentLoaded", () => {
             });
         } catch (error) {
             console.error("Error fetching laws:", error);
+            lawSelectionContainer.innerHTML = "<p>Error loading laws. Please try again later.</p>";
         }
     };
 
-    // Ensure the function is invoked
-    fetchLaws();
-});
+    // Toggle Contract Compliance Section
+    radioCohereChat.addEventListener("change", () => {
+        contractComplianceSection.classList.add("hidden");
+    });
 
+    radioContractCompliance.addEventListener("change", () => {
+        contractComplianceSection.classList.remove("hidden");
+        fetchLaws(); // Fetch laws when this section is made visible
+    });
 
     // Handle Sign-In Form Submission
     signInForm.addEventListener("submit", async (e) => {
@@ -108,29 +111,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 signInPopup.classList.add("hidden");
             } else {
                 showFeedback(data.error || "Sign-up failed.", true);
-            }
-        } catch (err) {
-            showFeedback("An error occurred. Please try again.", true);
-        }
-    });
-
-    // Handle Forgot Password Form Submission
-    forgotPasswordForm.addEventListener("submit", async (e) => {
-        e.preventDefault();
-        const email = document.getElementById("forgot-password-email").value;
-
-        try {
-            const response = await fetch("/api/forgot-password", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ email }),
-            });
-            const data = await response.json();
-            if (response.ok) {
-                showFeedback("Password sent to your email.", false);
-                forgotPasswordPopup.classList.add("hidden");
-            } else {
-                showFeedback(data.error || "Error sending password.", true);
             }
         } catch (err) {
             showFeedback("An error occurred. Please try again.", true);
@@ -167,9 +147,9 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 
-    // Helper to update compliance results
+    // Update Compliance Results
     const updateComplianceResults = (results) => {
-        resultsTableBody.innerHTML = ""; // Clear existing table rows
+        resultsTableBody.innerHTML = ""; // Clear existing rows
 
         results.forEach((result) => {
             const row = document.createElement("tr");
@@ -185,14 +165,12 @@ document.addEventListener("DOMContentLoaded", () => {
         complianceResultsContainer.classList.remove("hidden");
     };
 
-    // Handle Contract Compliance Submission
+    // Handle Contract Compliance
     cohereSendBtn.addEventListener("click", async () => {
         if (!isAuthenticated) {
             showFeedback("You must log in to use the service!", true);
             return;
         }
-
-        const authToken = localStorage.getItem("authToken");
 
         if (radioContractCompliance.checked) {
             const file = fileInput.files[0];
@@ -218,7 +196,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 const response = await fetch("/api/contract-compliance", {
                     method: "POST",
                     headers: {
-                        Authorization: `Bearer ${authToken}`,
+                        Authorization: `Bearer ${localStorage.getItem("authToken")}`,
                     },
                     body: formData,
                 });
@@ -235,6 +213,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 
+    // Show Feedback
     const showFeedback = (message, isError = false) => {
         feedback.textContent = message;
         feedback.style.background = isError ? "var(--error-color)" : "var(--success-color)";
@@ -245,6 +224,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }, 3000);
     };
 
+    // Reset Logout Timer
     const resetLogoutTimer = () => {
         clearTimeout(logoutTimer);
         logoutTimer = setTimeout(() => {
