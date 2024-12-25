@@ -17,6 +17,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const radioCohereChat = document.getElementById("radio-cohere-chat");
     const radioContractCompliance = document.getElementById("radio-contract-compliance");
     const lawSelectionContainer = document.createElement("div");
+    const resultsTableBody = document.getElementById("results-table-body");
+    const complianceResultsContainer = document.getElementById("compliance-results");
 
     let isAuthenticated = false;
     let logoutTimer;
@@ -133,33 +135,23 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 
-    // Handle Service Selection
-    const handleServiceChange = () => {
-        if (radioContractCompliance.checked) {
-            addMessage("bot", "Upload a contract file for compliance check.");
-            fileInput.classList.remove("hidden");
-            lawSelectionContainer.innerHTML = "<h3>Select Laws to Check:</h3>";
-            Object.keys(laws).forEach((lawId) => {
-                const checkbox = document.createElement("input");
-                checkbox.type = "checkbox";
-                checkbox.id = `law-${lawId}`;
-                checkbox.value = lawId;
-                const label = document.createElement("label");
-                label.htmlFor = `law-${lawId}`;
-                label.textContent = laws[lawId];
-                lawSelectionContainer.appendChild(checkbox);
-                lawSelectionContainer.appendChild(label);
-                lawSelectionContainer.appendChild(document.createElement("br"));
-            });
-            fileInput.parentElement.appendChild(lawSelectionContainer);
-        } else {
-            lawSelectionContainer.innerHTML = "";
-            fileInput.classList.add("hidden");
-        }
-    };
+    // Helper to update compliance results
+    const updateComplianceResults = (results) => {
+        resultsTableBody.innerHTML = ""; // Clear existing table rows
 
-    radioCohereChat.addEventListener("change", handleServiceChange);
-    radioContractCompliance.addEventListener("change", handleServiceChange);
+        results.forEach((result) => {
+            const row = document.createElement("tr");
+            row.innerHTML = `
+                <td>${result.law_id}</td>
+                <td>${laws[result.law_id] || "Unknown Law"}</td>
+                <td>${result.status}</td>
+                <td>${result.details}</td>
+            `;
+            resultsTableBody.appendChild(row);
+        });
+
+        complianceResultsContainer.classList.remove("hidden");
+    };
 
     // Handle Contract Compliance Submission
     cohereSendBtn.addEventListener("click", async () => {
@@ -200,34 +192,16 @@ document.addEventListener("DOMContentLoaded", () => {
                 });
 
                 const data = await response.json();
-                console.log("Server Response:", data);
-                if (response.ok) {
-                    if (Array.isArray(data.result)) {
-                        data.result.forEach((res) => {
-                            addMessage(
-                                "bot",
-                                `Law: ${laws[res.law_id]} - Status: ${res.status} - ${res.details || "No details"}`
-                            );
-                        });
-                    } else {
-                        addMessage("bot", `Unexpected response format: ${JSON.stringify(data.result)}`);
-                    }
+                if (response.ok && Array.isArray(data.result)) {
+                    updateComplianceResults(data.result);
                 } else {
-                    addMessage("bot", data.error || "Error connecting to server.");
+                    showFeedback(data.error || "Unexpected server error.", true);
                 }
-            } catch (err) {
-                addMessage("bot", "Error connecting to server.");
+            } catch (error) {
+                showFeedback("Error connecting to server.", true);
             }
         }
     });
-
-    const addMessage = (sender, message) => {
-        const messageDiv = document.createElement("div");
-        messageDiv.classList.add("message", sender);
-        messageDiv.textContent = message;
-        cohereChatBody.appendChild(messageDiv);
-        cohereChatBody.scrollTop = cohereChatBody.scrollHeight;
-    };
 
     const showFeedback = (message, isError = false) => {
         feedback.textContent = message;
@@ -248,4 +222,32 @@ document.addEventListener("DOMContentLoaded", () => {
             location.reload();
         }, 30 * 60 * 1000);
     };
+
+    // Handle Service Selection
+    const handleServiceChange = () => {
+        if (radioContractCompliance.checked) {
+            addMessage("bot", "Upload a contract file for compliance check.");
+            fileInput.classList.remove("hidden");
+            lawSelectionContainer.innerHTML = "<h3>Select Laws to Check:</h3>";
+            Object.keys(laws).forEach((lawId) => {
+                const checkbox = document.createElement("input");
+                checkbox.type = "checkbox";
+                checkbox.id = `law-${lawId}`;
+                checkbox.value = lawId;
+                const label = document.createElement("label");
+                label.htmlFor = `law-${lawId}`;
+                label.textContent = laws[lawId];
+                lawSelectionContainer.appendChild(checkbox);
+                lawSelectionContainer.appendChild(label);
+                lawSelectionContainer.appendChild(document.createElement("br"));
+            });
+            fileInput.parentElement.appendChild(lawSelectionContainer);
+        } else {
+            lawSelectionContainer.innerHTML = "";
+            fileInput.classList.add("hidden");
+        }
+    };
+
+    radioCohereChat.addEventListener("change", handleServiceChange);
+    radioContractCompliance.addEventListener("change", handleServiceChange);
 });

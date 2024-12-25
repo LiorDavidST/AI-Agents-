@@ -288,7 +288,9 @@ def contract_compliance():
             if not isinstance(law_text, str) or not law_text.strip():
                 compliance_results.append({
                     "law_id": law_id,
+                    "law_title": predefined_laws[law_id],
                     "status": "Error",
+                    "similarity_score": "N/A",
                     "details": "Law content is empty or invalid."
                 })
                 continue  # Skip processing this law
@@ -298,30 +300,13 @@ def contract_compliance():
                 user_chunks = chunk_text(user_content, max_tokens=500)
                 law_chunks = chunk_text(law_text, max_tokens=500)
 
-                # Validate chunks
-                for i, chunk in enumerate(user_chunks):
-                    token_count = len(tiktoken.get_encoding("cl100k_base").encode(chunk))
-                    if token_count > 512:
-                        raise ValueError(f"User chunk {i + 1} exceeds max tokens: {token_count}")
-                for i, chunk in enumerate(law_chunks):
-                    token_count = len(tiktoken.get_encoding("cl100k_base").encode(chunk))
-                    if token_count > 512:
-                        raise ValueError(f"Law chunk {i + 1} exceeds max tokens: {token_count}")
-
                 # Generate embeddings with batching
                 user_embeddings = batch_embeddings(user_chunks, batch_size=10)
                 law_embeddings = batch_embeddings(law_chunks, batch_size=10)
 
-                # Check if embeddings are valid
-                if not user_embeddings or not law_embeddings:
-                    raise ValueError("No valid embeddings were generated for user or law content.")
-
                 # Compute mean vectors
                 user_vector = np.mean(user_embeddings, axis=0) if user_embeddings else None
                 law_vector = np.mean(law_embeddings, axis=0) if law_embeddings else None
-
-                if user_vector is None or law_vector is None:
-                    raise ValueError("Mean vectors could not be computed due to empty embeddings.")
 
                 # Compute cosine similarity
                 similarity = cosine_similarity([user_vector], [law_vector])[0][0]
@@ -329,25 +314,42 @@ def contract_compliance():
                 # Append result
                 compliance_results.append({
                     "law_id": law_id,
+                    "law_title": predefined_laws[law_id],
                     "status": "Compliant" if similarity > 0.8 else "Non-Compliant",
-                    "details": f"Similarity score: {similarity:.2f}"
-                })
-            except ValueError as ve:
-                app.logger.error(f"Validation error for law {law_id}: {str(ve)}")
-                compliance_results.append({
-                    "law_id": law_id,
-                    "status": "Error",
-                    "details": str(ve)
+                    "similarity_score": f"{similarity:.2f}",
                 })
             except Exception as e:
                 app.logger.error(f"Error comparing law {law_id}: {str(e)}")
                 compliance_results.append({
                     "law_id": law_id,
+                    "law_title": predefined_laws[law_id],
                     "status": "Error",
+                    "similarity_score": "N/A",
                     "details": f"Error during compliance check: {str(e)}"
                 })
 
-        return jsonify({"result": compliance_results}), 200
+        # Create HTML table
+        html_table = """
+        <table border="1">
+            <tr>
+                <th>Law ID</th>
+                <th>Law Title</th>
+                <th>Status</th>
+                <th>Similarity Score</th>
+            </tr>
+        """
+        for result in compliance_results:
+            html_table += f"""
+            <tr>
+                <td>{result['law_id']}</td>
+                <td>{result['law_title']}</td>
+                <td>{result['status']}</td>
+                <td>{result['similarity_score']}</td>
+            </tr>
+            """
+        html_table += "</table>"
+
+        return html_table, 200
 
     except Exception as e:
         app.logger.error(f"Unexpected error in contract_compliance: {str(e)}")
@@ -357,7 +359,6 @@ def contract_compliance():
         # Ensure the uploaded file is cleaned up
         if os.path.exists(file_path):
             os.remove(file_path)
-
 
 @app.route("/", methods=["GET"])
 def serve_index():

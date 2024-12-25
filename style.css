@@ -64,6 +64,40 @@ body {
     background: #357ABD;
 }
 
+/* Compliance Results Table */
+#compliance-results {
+    margin-top: 20px;
+    padding: 20px;
+    background: var(--background-white);
+    border-radius: 10px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+#compliance-results table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+}
+
+#compliance-results th, #compliance-results td {
+    border: 1px solid #ddd;
+    padding: 8px;
+    text-align: left;
+}
+
+#compliance-results th {
+    background: var(--primary-color);
+    color: white;
+}
+
+#compliance-results tr:nth-child(even) {
+    background: #f9f9f9;
+}
+
+#compliance-results tr:hover {
+    background: #f1f1f1;
+}
+
 /* Popups (Sign-In & Forgot Password) */
 .popup {
     position: absolute;
@@ -213,8 +247,8 @@ textarea {
     resize: none;
     font-size: 14px;
     box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);
-	hight: 400px;
-	}
+    height: 400px;
+}
 
 .chat-right button {
     align-self: flex-end;

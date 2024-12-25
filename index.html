@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="icon" href="/static/favicon.ico" type="image/x-icon">
     <title>AI LAW SERVICES</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="/static/style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap">
 </head>
@@ -97,6 +97,24 @@
                 </div>
             </div>
         </div>
+    </div>
+
+    <!-- Compliance Results Table -->
+    <div id="compliance-results" class="hidden">
+        <h2>Compliance Results</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Law ID</th>
+                    <th>Law Title</th>
+                    <th>Status</th>
+                    <th>Details</th>
+                </tr>
+            </thead>
+            <tbody id="results-table-body">
+                <!-- Rows will be added dynamically via JavaScript -->
+            </tbody>
+        </table>
     </div>
 
     <script src="script.js"></script>
