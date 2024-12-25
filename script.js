@@ -52,36 +52,46 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     // Fetch predefined laws dynamically
-    const fetchLaws = async () => {
-        try {
-            const response = await fetch("/api/predefined-laws");
-            const data = await response.json();
-            const laws = data.laws;
+const fetchLaws = async () => {
+    try {
+        const response = await fetch("/api/predefined-laws"); // Fetch predefined laws from the backend
+        const data = await response.json(); // Parse the JSON response
+        const laws = data.laws; // Ensure the "laws" key exists in the response
 
-            lawSelectionContainer.innerHTML = ""; // Clear existing content
+        lawSelectionContainer.innerHTML = ""; // Clear existing content
 
-            Object.entries(laws).forEach(([lawId, lawTitle]) => {
+        // Iterate over laws to create checkboxes
+        Object.entries(laws).forEach(([lawId, lawTitle]) => {
+            if (typeof lawTitle === "string") { // Ensure lawTitle is a string
+                // Create a checkbox for each law
                 const checkbox = document.createElement("input");
                 checkbox.type = "checkbox";
                 checkbox.id = `law-${lawId}`;
                 checkbox.value = lawId;
 
+                // Create a label for the checkbox
                 const label = document.createElement("label");
                 label.setAttribute("for", `law-${lawId}`);
                 label.textContent = lawTitle;
 
+                // Create a container for the checkbox and label
                 const container = document.createElement("div");
                 container.className = "law-item";
                 container.appendChild(checkbox);
                 container.appendChild(label);
 
+                // Append the container to the law selection section
                 lawSelectionContainer.appendChild(container);
-            });
-        } catch (error) {
-            console.error("Error fetching laws:", error);
-            lawSelectionContainer.innerHTML = "<p>Error loading laws. Please try again later.</p>";
-        }
-    };
+            } else {
+                console.error(`Invalid law title for ID ${lawId}:`, lawTitle);
+            }
+        });
+    } catch (error) {
+        console.error("Error fetching laws:", error);
+        lawSelectionContainer.innerHTML = "<p>Error loading laws. Please try again later.</p>";
+    }
+};
+
 
     // Toggle Contract Compliance Section
     radioCohereChat.addEventListener("change", () => {
