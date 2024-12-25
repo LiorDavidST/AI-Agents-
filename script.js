@@ -16,20 +16,12 @@ document.addEventListener("DOMContentLoaded", () => {
     const fileInput = document.getElementById("file-input");
     const radioCohereChat = document.getElementById("radio-cohere-chat");
     const radioContractCompliance = document.getElementById("radio-contract-compliance");
-    const lawSelectionContainer = document.createElement("div");
+    const lawSelectionContainer = document.getElementById("law-selection");
     const resultsTableBody = document.getElementById("results-table-body");
     const complianceResultsContainer = document.getElementById("compliance-results");
 
     let isAuthenticated = false;
     let logoutTimer;
-
-    // Predefined laws
-    const laws = {
-        "1": "חוק המכר (דירות)",
-        "2": "חוק מכר דירות הבטחת השקעה 1974",
-        "3": "חוק מכר דירות הבטחת השקעה תיקון מספר 9",
-        "4": "תקנות המכר (דירות) (הבטחת השקעות של רוכשי דירות) (סייג לתשלומים על חשבון מחיר דירה), -1975",
-    };
 
     // Helper to close all open popups
     const closeAllPopups = () => {
@@ -57,6 +49,39 @@ document.addEventListener("DOMContentLoaded", () => {
         closeAllPopups();
         forgotPasswordPopup.classList.remove("hidden");
     });
+
+    // Fetch predefined laws from the backend
+    const fetchLaws = async () => {
+        try {
+            const response = await fetch("/api/predefined-laws");
+            const laws = await response.json();
+
+            // Clear existing laws and populate the container
+            lawSelectionContainer.innerHTML = "<h4>Select Laws to Compare:</h4>";
+            Object.entries(laws).forEach(([id, title]) => {
+                const checkbox = document.createElement("input");
+                checkbox.type = "checkbox";
+                checkbox.id = `law-${id}`;
+                checkbox.value = id;
+
+                const label = document.createElement("label");
+                label.htmlFor = `law-${id}`;
+                label.textContent = title;
+
+                const container = document.createElement("div");
+                container.appendChild(checkbox);
+                container.appendChild(label);
+
+                lawSelectionContainer.appendChild(container);
+            });
+        } catch (error) {
+            console.error("Error fetching laws:", error);
+            showFeedback("Failed to load laws. Please try again.", true);
+        }
+    };
+
+    // Fetch laws when the page loads
+    fetchLaws();
 
     // Handle Sign-In Form Submission
     signInForm.addEventListener("submit", async (e) => {
@@ -143,7 +168,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const row = document.createElement("tr");
             row.innerHTML = `
                 <td>${result.law_id}</td>
-                <td>${laws[result.law_id] || "Unknown Law"}</td>
+                <td>${result.law_title || "Unknown Law"}</td>
                 <td>${result.status}</td>
                 <td>${result.details}</td>
             `;
@@ -222,32 +247,4 @@ document.addEventListener("DOMContentLoaded", () => {
             location.reload();
         }, 30 * 60 * 1000);
     };
-
-    // Handle Service Selection
-    const handleServiceChange = () => {
-        if (radioContractCompliance.checked) {
-            addMessage("bot", "Upload a contract file for compliance check.");
-            fileInput.classList.remove("hidden");
-            lawSelectionContainer.innerHTML = "<h3>Select Laws to Check:</h3>";
-            Object.keys(laws).forEach((lawId) => {
-                const checkbox = document.createElement("input");
-                checkbox.type = "checkbox";
-                checkbox.id = `law-${lawId}`;
-                checkbox.value = lawId;
-                const label = document.createElement("label");
-                label.htmlFor = `law-${lawId}`;
-                label.textContent = laws[lawId];
-                lawSelectionContainer.appendChild(checkbox);
-                lawSelectionContainer.appendChild(label);
-                lawSelectionContainer.appendChild(document.createElement("br"));
-            });
-            fileInput.parentElement.appendChild(lawSelectionContainer);
-        } else {
-            lawSelectionContainer.innerHTML = "";
-            fileInput.classList.add("hidden");
-        }
-    };
-
-    radioCohereChat.addEventListener("change", handleServiceChange);
-    radioContractCompliance.addEventListener("change", handleServiceChange);
 });
