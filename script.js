@@ -1,110 +1,251 @@
 document.addEventListener("DOMContentLoaded", () => {
     // Elements
-    const lawSelectionContainer = document.getElementById("law-selection");
+    const signInLink = document.getElementById("sign-in-link");
+    const forgotPasswordLink = document.getElementById("forgot-password-link");
+    const signInPopup = document.getElementById("sign-in-popup");
+    const forgotPasswordPopup = document.getElementById("forgot-password-popup");
+    const closeButtons = document.querySelectorAll(".popup-close");
+    const signInForm = document.getElementById("sign-in-form");
+    const forgotPasswordForm = document.getElementById("forgot-password-form");
+    const loginForm = document.getElementById("login-form");
+    const feedback = document.getElementById("feedback");
+    const chatsContainer = document.getElementById("chats-container");
+    const cohereChatBody = document.getElementById("cohere-chat-body");
+    const cohereUserInput = document.getElementById("cohere-user-input");
+    const cohereSendBtn = document.getElementById("cohere-send-btn");
     const fileInput = document.getElementById("file-input");
-    const resultsTableBody = document.getElementById("results-table-body");
-    const complianceResultsContainer = document.getElementById("compliance-results");
-    const fetchLawTextEndpoint = "/api/fetch-law-text";
+    const radioCohereChat = document.getElementById("radio-cohere-chat");
+    const radioContractCompliance = document.getElementById("radio-contract-compliance");
+    const lawSelectionContainer = document.createElement("div");
 
-    // Fetch predefined laws dynamically
-    const fetchLaws = async () => {
-        try {
-            const response = await fetch("/api/predefined-laws");
-            const data = await response.json();
-            const laws = data.laws || {};
+    let isAuthenticated = false;
+    let logoutTimer;
 
-            lawSelectionContainer.innerHTML = ""; // Clear existing content
-
-            if (Object.keys(laws).length === 0) {
-                lawSelectionContainer.innerHTML = "<p>No laws available.</p>";
-                return;
-            }
-
-            Object.entries(laws).forEach(([lawId, lawTitle]) => {
-                const button = document.createElement("button");
-                button.textContent = lawTitle;
-                button.dataset.lawId = lawId;
-                button.className = "law-title-button";
-                button.addEventListener("click", () => handleLawSelection(lawId, lawTitle));
-                lawSelectionContainer.appendChild(button);
-            });
-        } catch (error) {
-            console.error("Error fetching laws:", error);
-            lawSelectionContainer.innerHTML = "<p>Error loading laws. Please try again later.</p>";
-        }
+    // Predefined laws
+    const laws = {
+        "1": "חוק מכר דירות  1973",
+        "2": "חוק מכר דירות הבטחת השקעה 1974",
+        "3": "חוק מכר דירות הבטחת השקעה תיקון מספר 9",
+        "4": "תקנות המכר (דירות) (הבטחת השקעות של רוכשי דירות) (סייג לתשלומים על חשבון מחיר דירה), -1975",
     };
 
-    // Handle law selection and fetch law text
-    const handleLawSelection = async (lawId, lawTitle) => {
+    // Helper to close all open popups
+    const closeAllPopups = () => {
+        signInPopup.classList.add("hidden");
+        forgotPasswordPopup.classList.add("hidden");
+    };
+
+    // Close Popup
+    closeButtons.forEach((button) => {
+        button.addEventListener("click", () => {
+            button.closest(".popup").classList.add("hidden");
+        });
+    });
+
+    // Show Sign-In Popup
+    signInLink.addEventListener("click", (e) => {
+        e.preventDefault();
+        closeAllPopups();
+        signInPopup.classList.remove("hidden");
+    });
+
+    // Show Forgot Password Popup
+    forgotPasswordLink.addEventListener("click", (e) => {
+        e.preventDefault();
+        closeAllPopups();
+        forgotPasswordPopup.classList.remove("hidden");
+    });
+
+    // Handle Sign-In Form Submission
+    signInForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const email = document.getElementById("sign-in-email").value;
+        const password = document.getElementById("sign-in-password").value;
+
         try {
-            const response = await fetch(fetchLawTextEndpoint, {
+            const response = await fetch("/api/sign-in", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ law_id: lawId }),
+                body: JSON.stringify({ email, password }),
             });
-
             const data = await response.json();
-            if (!response.ok) {
-                console.error("Error fetching law text:", data.error);
-                alert(`Failed to fetch the selected law: ${lawTitle}`);
-                return;
+            if (response.ok) {
+                showFeedback("Sign-up successful! Please log in.", false);
+                signInPopup.classList.add("hidden");
+            } else {
+                showFeedback(data.error || "Sign-up failed.", true);
             }
+        } catch (err) {
+            showFeedback("An error occurred. Please try again.", true);
+        }
+    });
 
-            const lawText = data.law_text;
-            compareWithUploadedFile(lawText, lawTitle);
-        } catch (error) {
-            console.error("Error fetching law text:", error);
-            alert("Error fetching the law text. Please try again.");
+    // Handle Forgot Password Form Submission
+    forgotPasswordForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const email = document.getElementById("forgot-password-email").value;
+
+        try {
+            const response = await fetch("/api/forgot-password", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email }),
+            });
+            const data = await response.json();
+            if (response.ok) {
+                showFeedback("Password sent to your email.", false);
+                forgotPasswordPopup.classList.add("hidden");
+            } else {
+                showFeedback(data.error || "Error sending password.", true);
+            }
+        } catch (err) {
+            showFeedback("An error occurred. Please try again.", true);
+        }
+    });
+
+    // Handle Login Form Submission
+    loginForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const email = document.getElementById("login-email").value;
+        const password = document.getElementById("login-password").value;
+
+        try {
+            const response = await fetch("/api/login", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email, password }),
+            });
+            const data = await response.json();
+            if (response.ok) {
+                const { token } = data;
+                localStorage.setItem("authToken", token);
+                isAuthenticated = true;
+                showFeedback("Login successful!", false);
+                loginForm.reset();
+                chatsContainer.classList.remove("hidden");
+                loginForm.parentElement.classList.add("hidden");
+                resetLogoutTimer();
+            } else {
+                showFeedback(data.error || "Login failed.", true);
+            }
+        } catch (err) {
+            showFeedback("Login failed. Please try again.", true);
+        }
+    });
+
+    // Handle Service Selection
+    const handleServiceChange = () => {
+        if (radioContractCompliance.checked) {
+            addMessage("bot", "Upload a contract file for compliance check.");
+            fileInput.classList.remove("hidden");
+            lawSelectionContainer.innerHTML = "<h3>Select Laws to Check:</h3>";
+            Object.keys(laws).forEach((lawId) => {
+                const checkbox = document.createElement("input");
+                checkbox.type = "checkbox";
+                checkbox.id = `law-${lawId}`;
+                checkbox.value = lawId;
+                const label = document.createElement("label");
+                label.htmlFor = `law-${lawId}`;
+                label.textContent = laws[lawId];
+                lawSelectionContainer.appendChild(checkbox);
+                lawSelectionContainer.appendChild(label);
+                lawSelectionContainer.appendChild(document.createElement("br"));
+            });
+            fileInput.parentElement.appendChild(lawSelectionContainer);
+        } else {
+            lawSelectionContainer.innerHTML = "";
+            fileInput.classList.add("hidden");
         }
     };
 
-    // Compare uploaded file with law text
-    const compareWithUploadedFile = async (lawText, lawTitle) => {
-        const file = fileInput.files[0];
-        if (!file) {
-            alert("Please upload a file first.");
+    radioCohereChat.addEventListener("change", handleServiceChange);
+    radioContractCompliance.addEventListener("change", handleServiceChange);
+
+    // Handle Contract Compliance Submission
+    cohereSendBtn.addEventListener("click", async () => {
+        if (!isAuthenticated) {
+            showFeedback("You must log in to use the service!", true);
             return;
         }
 
-        const formData = new FormData();
-        formData.append("file", file);
-        formData.append("law_text", lawText);
+        const authToken = localStorage.getItem("authToken");
 
-        try {
-            const response = await fetch("/api/contract-compliance", {
-                method: "POST",
-                body: formData,
-            });
-
-            const data = await response.json();
-            if (response.ok) {
-                displayComparisonResults(data.result, lawTitle);
-            } else {
-                alert(data.error || "Error during compliance check.");
+        if (radioContractCompliance.checked) {
+            const file = fileInput.files[0];
+            if (!file) {
+                showFeedback("Please upload a file for analysis.", true);
+                return;
             }
-        } catch (error) {
-            console.error("Error during compliance check:", error);
-            alert("Error during compliance check. Please try again.");
+
+            const selectedLaws = Array.from(
+                lawSelectionContainer.querySelectorAll("input[type=checkbox]:checked")
+            ).map((checkbox) => checkbox.value);
+
+            if (!selectedLaws.length) {
+                showFeedback("Please select at least one law for analysis.", true);
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append("file", file);
+            selectedLaws.forEach((law) => formData.append("selected_laws", law));
+
+            try {
+                const response = await fetch("/api/contract-compliance", {
+                    method: "POST",
+                    headers: {
+                        Authorization: `Bearer ${authToken}`,
+                    },
+                    body: formData,
+                });
+
+                const data = await response.json();
+                console.log("Server Response:", data);
+                if (response.ok) {
+                    if (Array.isArray(data.result)) {
+                        data.result.forEach((res) => {
+                            addMessage(
+                                "bot",
+                                `Law: ${laws[res.law_id]} - Status: ${res.status} - ${res.details || "No details"}`
+                            );
+                        });
+                    } else {
+                        addMessage("bot", `Unexpected response format: ${JSON.stringify(data.result)}`);
+                    }
+                } else {
+                    addMessage("bot", data.error || "Error connecting to server.");
+                }
+            } catch (err) {
+                addMessage("bot", "Error connecting to server.");
+            }
         }
+    });
+
+    const addMessage = (sender, message) => {
+        const messageDiv = document.createElement("div");
+        messageDiv.classList.add("message", sender);
+        messageDiv.textContent = message;
+        cohereChatBody.appendChild(messageDiv);
+        cohereChatBody.scrollTop = cohereChatBody.scrollHeight;
     };
 
-    // Display comparison results
-    const displayComparisonResults = (results, lawTitle) => {
-        resultsTableBody.innerHTML = ""; // Clear existing rows
+    const showFeedback = (message, isError = false) => {
+        feedback.textContent = message;
+        feedback.style.background = isError ? "var(--error-color)" : "var(--success-color)";
+        feedback.classList.remove("hidden");
 
-        results.forEach((result) => {
-            const row = document.createElement("tr");
-            row.innerHTML = `
-                <td>${result.section}</td>
-                <td>${result.compliance ? "Compliant" : "Non-Compliant"}</td>
-            `;
-            resultsTableBody.appendChild(row);
-        });
-
-        complianceResultsContainer.querySelector("h2").textContent = `Compliance Results for ${lawTitle}`;
-        complianceResultsContainer.classList.remove("hidden");
+        setTimeout(() => {
+            feedback.classList.add("hidden");
+        }, 3000);
     };
 
-    // Fetch laws on page load
-    fetchLaws();
+    const resetLogoutTimer = () => {
+        clearTimeout(logoutTimer);
+        logoutTimer = setTimeout(() => {
+            isAuthenticated = false;
+            localStorage.removeItem("authToken");
+            showFeedback("Session expired. Please log in again.", true);
+            location.reload();
+        }, 30 * 60 * 1000);
+    };
 });
