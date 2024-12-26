@@ -10,6 +10,62 @@ import jwt
 from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
 import tiktoken
+import logging
+
+def chunk_text(text, max_tokens=512):
+    """
+    Split text into chunks of at most `max_tokens` tokens, ensuring no chunk exceeds the limit.
+
+    Parameters:
+        text (str): Input text to split.
+        max_tokens (int): Maximum number of tokens per chunk.
+
+    Returns:
+        List[str]: List of text chunks.
+    """
+    if not isinstance(text, str):
+        raise ValueError("Input must be a string.")
+    if not isinstance(max_tokens, int) or max_tokens <= 0:
+        raise ValueError("`max_tokens` must be a positive integer.")
+
+    tokenizer = tiktoken.get_encoding("cl100k_base")
+    tokens = tokenizer.encode(text)
+    total_tokens = len(tokens)
+
+    # Log initial information
+    logging.info(f"Chunking text of {total_tokens} tokens into chunks of max {max_tokens} tokens.")
+
+    chunks = []
+    current_chunk = []
+
+    for i, token in enumerate(tokens):
+        if len(current_chunk) + 1 > max_tokens:
+            # Finalize the current chunk
+            chunk_text = tokenizer.decode(current_chunk)
+            chunk_size = len(tokenizer.encode(chunk_text))
+            chunks.append(chunk_text)
+            logging.debug(f"Chunk created with {chunk_size} tokens at index {i}.")
+            current_chunk = []
+
+        current_chunk.append(token)
+
+    # Add any remaining tokens as the last chunk
+    if current_chunk:
+        chunk_text = tokenizer.decode(current_chunk)
+        chunk_size = len(tokenizer.encode(chunk_text))
+        chunks.append(chunk_text)
+        logging.debug(f"Final chunk created with {chunk_size} tokens.")
+
+    # Log summary of chunks
+    for idx, chunk in enumerate(chunks):
+        chunk_size = len(tokenizer.encode(chunk))
+        if chunk_size > max_tokens:
+            logging.error(f"Chunk {idx + 1} exceeds max_tokens: {chunk_size} tokens.")
+        else:
+            logging.info(f"Chunk {idx + 1} contains {chunk_size} tokens.")
+
+    logging.info(f"Total chunks created: {len(chunks)}.")
+    return chunks
 
 app = Flask(__name__)
 
@@ -199,7 +255,14 @@ def contract_compliance():
 
                     # Log chunk details for debugging
                     app.logger.info(f"Number of user_chunks: {len(user_chunks)}")
+                    for idx, chunk in enumerate(user_chunks):
+                        chunk_size = len(tiktoken.get_encoding("cl100k_base").encode(chunk))
+                        app.logger.debug(f"User chunk {idx + 1}: {chunk_size} tokens.")
+
                     app.logger.info(f"Number of law_chunks: {len(law_chunks)}")
+                    for idx, chunk in enumerate(law_chunks):
+                        chunk_size = len(tiktoken.get_encoding("cl100k_base").encode(chunk))
+                        app.logger.debug(f"Law chunk {idx + 1}: {chunk_size} tokens.")
 
                     # Generate embeddings for all chunks
                     user_embeddings = co.embed(texts=user_chunks).embeddings
