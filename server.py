@@ -10,13 +10,7 @@ import jwt
 from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
 import tiktoken
-import logging
-from time import sleep  # For retry logic
 
-# Logging Configuration
-logging.basicConfig(level=logging.INFO)
-
-# Initialize Flask App
 app = Flask(__name__)
 
 # Enable CORS
@@ -34,43 +28,12 @@ client = MongoClient(MONGO_URI)
 db = client["ai_service"]
 users_collection = db["users"]
 
-# API Keys and Other Configs
 COHERE_API_KEY = os.environ.get("COHERE_API_KEY", "your_default_cohere_api_key")
 JWT_SECRET = os.environ.get("JWT_SECRET", "JWT_secret_key")
 JWT_EXPIRATION_MINUTES = int(os.environ.get("JWT_EXPIRATION_MINUTES", 30))
 co = cohere.Client(COHERE_API_KEY)
 
 # Helper Functions
-def generate_embeddings_with_rate_handling(chunks, retries=3):
-    for attempt in range(retries):
-        try:
-            return co.embed(texts=chunks).embeddings
-        except Exception as e:
-            if "rate limit exceeded" in str(e).lower():
-                logging.warning("Rate limit exceeded. Waiting for 60 seconds before retrying.")
-                sleep(60)
-            else:
-                logging.warning(f"Attempt {attempt + 1} failed: {str(e)}")
-                sleep(2 ** attempt)
-    logging.error("All embedding generation attempts failed.")
-    return []
-
-def chunk_text(text, max_tokens=512):
-    tokenizer = tiktoken.get_encoding("cl100k_base")
-    tokens = tokenizer.encode(text)
-    chunks, current_chunk = [], []
-
-    for token in tokens:
-        if len(current_chunk) + 1 > max_tokens:
-            chunks.append(tokenizer.decode(current_chunk))
-            current_chunk = []
-        current_chunk.append(token)
-
-    if current_chunk:
-        chunks.append(tokenizer.decode(current_chunk))
-    
-    return [chunk for chunk in chunks if len(tokenizer.encode(chunk)) <= max_tokens]
-
 def generate_token(email):
     expiration = datetime.utcnow() + timedelta(minutes=JWT_EXPIRATION_MINUTES)
     return jwt.encode({"email": email, "exp": expiration}, JWT_SECRET, algorithm="HS256")
@@ -85,16 +48,50 @@ def decode_token(token):
         return None
 
 def load_laws():
+    """Load laws from the HookeyMecher directory."""
     laws = {}
     try:
         for filename in os.listdir(LAWS_FOLDER):
             if filename.endswith(".txt"):
                 law_id = os.path.splitext(filename)[0].strip()
-                with open(os.path.join(LAWS_FOLDER, filename), "r", encoding="utf-8") as file:
-                    laws[law_id] = file.read()
+                file_path = os.path.join(LAWS_FOLDER, filename)
+                try:
+                    with open(file_path, "r", encoding="utf-8") as file:
+                        laws[law_id] = file.read()
+                    app.logger.info(f"Successfully loaded law file: {filename}")
+                except UnicodeDecodeError:
+                    app.logger.error(f"Failed to decode file {filename}. Ensure it's UTF-8 encoded.")
+                except Exception as e:
+                    app.logger.error(f"Error reading file {filename}: {str(e)}")
+        if laws:
+            app.logger.info(f"Loaded law IDs: {list(laws.keys())}")
+        else:
+            app.logger.warning("No valid laws were loaded from the HookeyMecher directory.")
     except Exception as e:
-        app.logger.error(f"Error loading laws: {e}")
+        app.logger.error(f"Error loading laws from directory: {str(e)}")
     return laws
+
+def chunk_text(text, max_tokens=512):
+    """Split text into chunks of at most `max_tokens` tokens."""
+    tokenizer = tiktoken.get_encoding("cl100k_base")
+    tokens = tokenizer.encode(text)  # Encode the text into tokens
+    chunks = []
+    current_chunk = []
+
+    for token in tokens:
+        current_chunk.append(token)
+        # If adding the token exceeds the limit, save the chunk
+        if len(current_chunk) >= max_tokens:
+            chunks.append(tokenizer.decode(current_chunk))
+            current_chunk = []  # Start a new chunk
+
+    # Add any remaining tokens as the last chunk
+    if current_chunk:
+        chunks.append(tokenizer.decode(current_chunk))
+
+    return chunks
+
+
 
 @app.route("/api/sign-in", methods=["POST"])
 def sign_in():
@@ -102,12 +99,14 @@ def sign_in():
     if not data or "email" not in data or "password" not in data:
         return jsonify({"error": "Invalid input"}), 400
 
-    email, password = data["email"], data["password"]
+    email = data["email"]
+    password = data["password"]
+
     if len(password) < 8:
         return jsonify({"error": "Password must be at least 8 characters"}), 400
 
     if users_collection.find_one({"email": email}):
-        return jsonify({"error": "Email already registered"}), 400
+        return jsonify({"error": f"The email '{email}' is already registered. Please log in or use a different email."}), 400
 
     password_hash = generate_password_hash(password)
     users_collection.insert_one({"email": email, "password_hash": password_hash})
@@ -119,69 +118,110 @@ def login():
     if not data or "email" not in data or "password" not in data:
         return jsonify({"error": "Invalid input"}), 400
 
-    email, password = data["email"], data["password"]
+    email = data["email"]
+    password = data["password"]
+
     user = users_collection.find_one({"email": email})
-    if not user or not check_password_hash(user["password_hash"], password):
+    if not user:
         return jsonify({"error": "Invalid email or password"}), 401
 
-    token = generate_token(email)
-    return jsonify({"message": "Login successful", "token": token}), 200
+    if check_password_hash(user["password_hash"], password):
+        token = generate_token(email)
+        return jsonify({"message": "Login successful", "token": token}), 200
+    else:
+        return jsonify({"error": "Invalid email or password"}), 401
 
 @app.route("/api/contract-compliance", methods=["POST"])
 def contract_compliance():
     try:
-        token = request.headers.get("Authorization", "").replace("Bearer ", "")
-        if not decode_token(token):
-            return jsonify({"error": "Invalid or missing token"}), 401
+        # Authorization and file validation
+        token = request.headers.get("Authorization")
+        if not token:
+            return jsonify({"error": "Authorization token is missing"}), 401
+
+        token = token.replace("Bearer ", "")
+        email = decode_token(token)
+        if not email:
+            return jsonify({"error": "Invalid or expired token"}), 401
 
         if "file" not in request.files or not request.form.getlist("selected_laws"):
-            return jsonify({"error": "File and selected laws required"}), 400
+            return jsonify({"error": "File and selected laws are required"}), 400
 
         file = request.files["file"]
-        if not file.filename:
+        if file.filename == "":
             return jsonify({"error": "No file selected"}), 400
 
         filename = secure_filename(file.filename)
         file_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
         file.save(file_path)
 
-        with open(file_path, "rb") as f:
-            file_content = f.read()
-        user_content = file_content.decode("utf-8", errors="ignore")
-        os.remove(file_path)
+        # Read and decode the uploaded file
+        try:
+            with open(file_path, "rb") as f:
+                file_content = f.read()
+            try:
+                user_content = file_content.decode("utf-8")
+            except UnicodeDecodeError:
+                user_content = file_content.decode("iso-8859-1")
+        except Exception as e:
+            app.logger.error(f"Failed to read file: {str(e)}")
+            return jsonify({"error": f"Failed to read the uploaded file: {str(e)}"}), 500
 
+        # Process laws and compliance check
         selected_laws = request.form.getlist("selected_laws")
         laws = load_laws()
         compliance_results = []
 
         for law_id in selected_laws:
-            if law_id not in laws:
-                compliance_results.append({"law_id": law_id, "status": "Not Found"})
-                continue
+            if law_id in laws:
+                law_text = laws[law_id]
+                try:
+                    # Chunk the user content and law text
+                    user_chunks = chunk_text(user_content, max_tokens=512)
+                    law_chunks = chunk_text(law_text, max_tokens=512)
 
-            user_chunks = chunk_text(user_content)
-            law_chunks = chunk_text(laws[law_id])
-            user_embeddings = generate_embeddings_with_rate_handling(user_chunks)
-            law_embeddings = generate_embeddings_with_rate_handling(law_chunks)
+                    # Log chunk details for debugging
+                    app.logger.info(f"Number of user_chunks: {len(user_chunks)}")
+                    app.logger.info(f"Number of law_chunks: {len(law_chunks)}")
 
-            if not user_embeddings or not law_embeddings:
-                compliance_results.append({"law_id": law_id, "status": "Error"})
-                continue
+                    # Generate embeddings for all chunks
+                    user_embeddings = co.embed(texts=user_chunks).embeddings
+                    law_embeddings = co.embed(texts=law_chunks).embeddings
 
-            user_vector = np.mean(user_embeddings, axis=0)
-            law_vector = np.mean(law_embeddings, axis=0)
-            similarity = cosine_similarity([user_vector], [law_vector])[0][0]
-            compliance_results.append({
-                "law_id": law_id,
-                "status": "Compliant" if similarity > 0.8 else "Non-Compliant",
-                "details": f"Similarity score: {similarity:.2f}"
-            })
+                    # Aggregate embeddings
+                    user_vector = np.mean(user_embeddings, axis=0)
+                    law_vector = np.mean(law_embeddings, axis=0)
+
+                    # Compute cosine similarity
+                    similarity = cosine_similarity([user_vector], [law_vector])[0][0]
+
+                    compliance_results.append({
+                        "law_id": law_id,
+                        "status": "Compliant" if similarity > 0.8 else "Non-Compliant",
+                        "details": f"Similarity score: {similarity:.2f}"
+                    })
+                except Exception as e:
+                    app.logger.error(f"Error comparing law {law_id}: {str(e)}")
+                    compliance_results.append({
+                        "law_id": law_id,
+                        "status": "Error",
+                        "details": f"Error during compliance check: {str(e)}"
+                    })
+            else:
+                compliance_results.append({
+                    "law_id": law_id,
+                    "status": "Not Found",
+                    "details": "Law not found in the system."
+                })
 
         return jsonify({"result": compliance_results}), 200
-    except Exception as e:
-        app.logger.error(f"Error in contract_compliance: {e}")
-        return jsonify({"error": "Internal server error"}), 500
 
+    except Exception as e:
+        app.logger.error(f"Unexpected error in contract_compliance: {str(e)}")
+        return jsonify({"error": "Internal server error", "details": str(e)}), 500
+
+
+# Static File Serving
 @app.route("/", methods=["GET"])
 def serve_index():
     return send_from_directory(".", "index.html")
@@ -191,8 +231,8 @@ def serve_static_files(path):
     try:
         return send_from_directory(".", path)
     except Exception as e:
-        app.logger.error(f"File not found: {path} - {e}")
-        return make_response("File not found", 404)
+        app.logger.error(f"File not found: {path} - {str(e)}")
+        return make_response(f"File not found: {path}", 404)
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
