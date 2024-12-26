@@ -72,24 +72,37 @@ def load_laws():
     return laws
 
 def chunk_text(text, max_tokens=512):
-    """Split text into chunks of at most `max_tokens` tokens."""
+    """
+    Split text into chunks of at most `max_tokens` tokens.
+
+    Parameters:
+        text (str): Input text to split.
+        max_tokens (int): Maximum number of tokens per chunk.
+
+    Returns:
+        List[str]: List of text chunks.
+    """
+    if not isinstance(text, str):
+        raise ValueError("Input must be a string.")
+    if not isinstance(max_tokens, int) or max_tokens <= 0:
+        raise ValueError("`max_tokens` must be a positive integer.")
+
     tokenizer = tiktoken.get_encoding("cl100k_base")
-    tokens = tokenizer.encode(text)  # Encode the text into tokens
+    tokens = tokenizer.encode(text)
     chunks = []
     current_chunk = []
 
     for token in tokens:
         current_chunk.append(token)
-        # If adding the token exceeds the limit, save the chunk
         if len(current_chunk) >= max_tokens:
             chunks.append(tokenizer.decode(current_chunk))
-            current_chunk = []  # Start a new chunk
+            current_chunk = []
 
-    # Add any remaining tokens as the last chunk
     if current_chunk:
         chunks.append(tokenizer.decode(current_chunk))
 
     return chunks
+
 
 
 
