@@ -10,6 +10,121 @@ import jwt
 from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
 import tiktoken
+import logging
+from time import sleep  # For retry logic
+
+def generate_embeddings_with_rate_handling(chunks, retries=3):
+    """
+    Generate embeddings with retry logic and rate limit handling.
+
+    Parameters:
+        chunks (List[str]): List of text chunks to generate embeddings for.
+        retries (int): Number of retry attempts in case of failure.
+
+    Returns:
+        List[List[float]]: List of embeddings for each chunk.
+    """
+    for attempt in range(retries):
+        try:
+            return co.embed(texts=chunks).embeddings
+        except Exception as e:
+            if "rate limit exceeded" in str(e).lower():
+                logging.warning("Rate limit exceeded. Waiting for 60 seconds before retrying.")
+                sleep(60)  # Wait before retrying
+            else:
+                logging.warning(f"Attempt {attempt + 1} failed: {str(e)}")
+                sleep(2 ** attempt)  # Exponential backoff
+    logging.error("All embedding generation attempts failed.")
+    return []
+
+def chunk_text(text, max_tokens=512):
+    """
+    Split text into chunks of at most `max_tokens` tokens, ensuring no chunk exceeds the limit.
+
+    Parameters:
+        text (str): Input text to split.
+        max_tokens (int): Maximum number of tokens per chunk.
+
+    Returns:
+        List[str]: List of text chunks.
+    """
+    if not isinstance(text, str):
+        raise ValueError("Input must be a string.")
+    if not isinstance(max_tokens, int) or max_tokens <= 0:
+        raise ValueError("`max_tokens` must be a positive integer.")
+
+    tokenizer = tiktoken.get_encoding("cl100k_base")
+    tokens = tokenizer.encode(text)
+    total_tokens = len(tokens)
+
+    # Log initial information
+    logging.info(f"Chunking text of {total_tokens} tokens into chunks of max {max_tokens} tokens.")
+
+    chunks = []
+    current_chunk = []
+
+    for token in tokens:
+        if len(current_chunk) + 1 > max_tokens:
+            # Finalize the current chunk
+            chunks.append(tokenizer.decode(current_chunk))
+            current_chunk = []
+
+        current_chunk.append(token)
+
+    # Add any remaining tokens as the last chunk
+    if current_chunk:
+        chunks.append(tokenizer.decode(current_chunk))
+
+    # Validate and filter chunks to ensure no chunk exceeds max_tokens
+    valid_chunks = [chunk for chunk in chunks if len(tokenizer.encode(chunk)) <= max_tokens]
+
+    # Log summary of chunks
+    for idx, chunk in enumerate(valid_chunks):
+        chunk_size = len(tokenizer.encode(chunk))
+        logging.info(f"Chunk {idx + 1} contains {chunk_size} tokens.")
+
+    logging.info(f"Total valid chunks created: {len(valid_chunks)}.")
+
+    # Return only valid chunks
+    return valid_chunks
+
+@app.route("/api/sign-in", methods=["POST"])
+def sign_in():
+    data = request.json
+    if not data or "email" not in data or "password" not in data:
+        return jsonify({"error": "Invalid input"}), 400
+
+    email = data["email"]
+    password = data["password"]
+
+    if len(password) < 8:
+        return jsonify({"error": "Password must be at least 8 characters"}), 400
+
+    if users_collection.find_one({"email": email}):
+        return jsonify({"error": f"The email '{email}' is already registered. Please log in or use a different email."}), 400
+
+    password_hash = generate_password_hash(password)
+    users_collection.insert_one({"email": email, "password_hash": password_hash})
+    return jsonify({"message": "Sign-up successful"}), 201
+
+@app.route("/api/login", methods=["POST"])
+def login():
+    data = request.json
+    if not data or "email" not in data or "password" not in data:
+        return jsonify({"error": "Invalid input"}), 400
+
+    email = data["email"]
+    password = data["password"]
+
+    user = users_collection.find_one({"email": email})
+    if not user:
+        return jsonify({"error": "Invalid email or password"}), 401
+
+    if check_password_hash(user["password_hash"], password):
+        token = generate_token(email)
+        return jsonify({"message": "Login successful", "token": token}), 200
+    else:
+        return jsonify({"error": "Invalid email or password"}), 401
 
 app = Flask(__name__)
 
@@ -71,66 +186,6 @@ def load_laws():
         app.logger.error(f"Error loading laws from directory: {str(e)}")
     return laws
 
-def chunk_text(text, max_tokens=512):
-    """Split text into chunks of at most `max_tokens` tokens."""
-    tokenizer = tiktoken.get_encoding("cl100k_base")
-    tokens = tokenizer.encode(text)  # Encode the text into tokens
-    chunks = []
-    current_chunk = []
-
-    for token in tokens:
-        current_chunk.append(token)
-        # If adding the token exceeds the limit, save the chunk
-        if len(current_chunk) >= max_tokens:
-            chunks.append(tokenizer.decode(current_chunk))
-            current_chunk = []  # Start a new chunk
-
-    # Add any remaining tokens as the last chunk
-    if current_chunk:
-        chunks.append(tokenizer.decode(current_chunk))
-
-    return chunks
-
-
-
-@app.route("/api/sign-in", methods=["POST"])
-def sign_in():
-    data = request.json
-    if not data or "email" not in data or "password" not in data:
-        return jsonify({"error": "Invalid input"}), 400
-
-    email = data["email"]
-    password = data["password"]
-
-    if len(password) < 8:
-        return jsonify({"error": "Password must be at least 8 characters"}), 400
-
-    if users_collection.find_one({"email": email}):
-        return jsonify({"error": f"The email '{email}' is already registered. Please log in or use a different email."}), 400
-
-    password_hash = generate_password_hash(password)
-    users_collection.insert_one({"email": email, "password_hash": password_hash})
-    return jsonify({"message": "Sign-up successful"}), 201
-
-@app.route("/api/login", methods=["POST"])
-def login():
-    data = request.json
-    if not data or "email" not in data or "password" not in data:
-        return jsonify({"error": "Invalid input"}), 400
-
-    email = data["email"]
-    password = data["password"]
-
-    user = users_collection.find_one({"email": email})
-    if not user:
-        return jsonify({"error": "Invalid email or password"}), 401
-
-    if check_password_hash(user["password_hash"], password):
-        token = generate_token(email)
-        return jsonify({"message": "Login successful", "token": token}), 200
-    else:
-        return jsonify({"error": "Invalid email or password"}), 401
-
 @app.route("/api/contract-compliance", methods=["POST"])
 def contract_compliance():
     try:
@@ -166,6 +221,9 @@ def contract_compliance():
         except Exception as e:
             app.logger.error(f"Failed to read file: {str(e)}")
             return jsonify({"error": f"Failed to read the uploaded file: {str(e)}"}), 500
+        finally:
+            if os.path.exists(file_path):
+                os.remove(file_path)  # Ensure cleanup happens
 
         # Process laws and compliance check
         selected_laws = request.form.getlist("selected_laws")
@@ -176,23 +234,27 @@ def contract_compliance():
             if law_id in laws:
                 law_text = laws[law_id]
                 try:
-                    # Chunk the user content and law text
-                    user_chunks = chunk_text(user_content, max_tokens=512)
-                    law_chunks = chunk_text(law_text, max_tokens=512)
+                    # Chunk the user content and law text, filtering out empty chunks
+                    user_chunks = [chunk for chunk in chunk_text(user_content, max_tokens=512) if chunk.strip()]
+                    law_chunks = [chunk for chunk in chunk_text(law_text, max_tokens=512) if chunk.strip()]
 
-                    # Log chunk details for debugging
+                    # Add debug logging for insights
+                    app.logger.debug(f"Raw user text length: {len(user_content)}")
+                    app.logger.debug(f"Raw law text length: {len(law_text)}")
+                    app.logger.debug(f"First user chunk: {user_chunks[0] if user_chunks else 'N/A'}")
+
                     app.logger.info(f"Number of user_chunks: {len(user_chunks)}")
                     app.logger.info(f"Number of law_chunks: {len(law_chunks)}")
 
-                    # Generate embeddings for all chunks
-                    user_embeddings = co.embed(texts=user_chunks).embeddings
-                    law_embeddings = co.embed(texts=law_chunks).embeddings
+                    # Generate embeddings and validate
+                    user_embeddings = generate_embeddings_with_rate_handling(user_chunks)
+                    law_embeddings = generate_embeddings_with_rate_handling(law_chunks)
+                    if not user_embeddings or not law_embeddings:
+                        raise ValueError("Failed to generate embeddings.")
 
-                    # Aggregate embeddings
+                    # Aggregate embeddings and compute similarity
                     user_vector = np.mean(user_embeddings, axis=0)
                     law_vector = np.mean(law_embeddings, axis=0)
-
-                    # Compute cosine similarity
                     similarity = cosine_similarity([user_vector], [law_vector])[0][0]
 
                     compliance_results.append({
@@ -219,7 +281,6 @@ def contract_compliance():
     except Exception as e:
         app.logger.error(f"Unexpected error in contract_compliance: {str(e)}")
         return jsonify({"error": "Internal server error", "details": str(e)}), 500
-
 
 # Static File Serving
 @app.route("/", methods=["GET"])

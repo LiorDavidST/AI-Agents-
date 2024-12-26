@@ -56,53 +56,6 @@ document.addEventListener("DOMContentLoaded", () => {
         forgotPasswordPopup.classList.remove("hidden");
     });
 
-    // Handle Sign-In Form Submission
-    signInForm.addEventListener("submit", async (e) => {
-        e.preventDefault();
-        const email = document.getElementById("sign-in-email").value;
-        const password = document.getElementById("sign-in-password").value;
-
-        try {
-            const response = await fetch("/api/sign-in", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ email, password }),
-            });
-            const data = await response.json();
-            if (response.ok) {
-                showFeedback("Sign-up successful! Please log in.", false);
-                signInPopup.classList.add("hidden");
-            } else {
-                showFeedback(data.error || "Sign-up failed.", true);
-            }
-        } catch (err) {
-            showFeedback("An error occurred. Please try again.", true);
-        }
-    });
-
-    // Handle Forgot Password Form Submission
-    forgotPasswordForm.addEventListener("submit", async (e) => {
-        e.preventDefault();
-        const email = document.getElementById("forgot-password-email").value;
-
-        try {
-            const response = await fetch("/api/forgot-password", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ email }),
-            });
-            const data = await response.json();
-            if (response.ok) {
-                showFeedback("Password sent to your email.", false);
-                forgotPasswordPopup.classList.add("hidden");
-            } else {
-                showFeedback(data.error || "Error sending password.", true);
-            }
-        } catch (err) {
-            showFeedback("An error occurred. Please try again.", true);
-        }
-    });
-
     // Handle Login Form Submission
     loginForm.addEventListener("submit", async (e) => {
         e.preventDefault();
@@ -115,7 +68,11 @@ document.addEventListener("DOMContentLoaded", () => {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ email, password }),
             });
+
             const data = await response.json();
+
+            console.log("Login response:", response.status, data);
+
             if (response.ok) {
                 const { token } = data;
                 localStorage.setItem("authToken", token);
@@ -129,37 +86,10 @@ document.addEventListener("DOMContentLoaded", () => {
                 showFeedback(data.error || "Login failed.", true);
             }
         } catch (err) {
+            console.error("Error during login request:", err);
             showFeedback("Login failed. Please try again.", true);
         }
     });
-
-    // Handle Service Selection
-    const handleServiceChange = () => {
-        if (radioContractCompliance.checked) {
-            addMessage("bot", "Upload a contract file for compliance check.");
-            fileInput.classList.remove("hidden");
-            lawSelectionContainer.innerHTML = "<h3>Select Laws to Check:</h3>";
-            Object.keys(laws).forEach((lawId) => {
-                const checkbox = document.createElement("input");
-                checkbox.type = "checkbox";
-                checkbox.id = `law-${lawId}`;
-                checkbox.value = lawId;
-                const label = document.createElement("label");
-                label.htmlFor = `law-${lawId}`;
-                label.textContent = laws[lawId];
-                lawSelectionContainer.appendChild(checkbox);
-                lawSelectionContainer.appendChild(label);
-                lawSelectionContainer.appendChild(document.createElement("br"));
-            });
-            fileInput.parentElement.appendChild(lawSelectionContainer);
-        } else {
-            lawSelectionContainer.innerHTML = "";
-            fileInput.classList.add("hidden");
-        }
-    };
-
-    radioCohereChat.addEventListener("change", handleServiceChange);
-    radioContractCompliance.addEventListener("change", handleServiceChange);
 
     // Handle Contract Compliance Submission
     cohereSendBtn.addEventListener("click", async () => {
@@ -216,6 +146,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     addMessage("bot", data.error || "Error connecting to server.");
                 }
             } catch (err) {
+                console.error("Error during compliance request:", err);
                 addMessage("bot", "Error connecting to server.");
             }
         }
