@@ -73,7 +73,7 @@ def load_laws():
 
 def chunk_text(text, max_tokens=512):
     """
-    Split text into chunks of at most `max_tokens` tokens.
+    Split text into chunks of at most `max_tokens` tokens, ensuring no chunk exceeds the limit.
 
     Parameters:
         text (str): Input text to split.
@@ -93,15 +93,19 @@ def chunk_text(text, max_tokens=512):
     current_chunk = []
 
     for token in tokens:
-        current_chunk.append(token)
-        if len(current_chunk) >= max_tokens:
+        # Add the token to the current chunk
+        if len(current_chunk) + 1 > max_tokens:
+            # If adding the token exceeds the limit, finalize the current chunk
             chunks.append(tokenizer.decode(current_chunk))
             current_chunk = []
+        current_chunk.append(token)
 
+    # Add any remaining tokens as the last chunk
     if current_chunk:
         chunks.append(tokenizer.decode(current_chunk))
 
     return chunks
+
 
 
 
