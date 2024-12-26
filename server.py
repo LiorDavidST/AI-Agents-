@@ -11,6 +11,18 @@ from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
 import tiktoken
 import logging
+import time
+
+def generate_embeddings_with_retry(chunks, retries=3):
+    for attempt in range(retries):
+        try:
+            return co.embed(texts=chunks).embeddings
+        except Exception as e:
+            logging.warning(f"Embedding generation attempt {attempt + 1} failed: {str(e)}")
+            time.sleep(2 ** attempt)  # Exponential backoff
+    logging.error("All embedding generation attempts failed.")
+    return []
+
 
 def chunk_text(text, max_tokens=512):
     """
@@ -126,7 +138,42 @@ def load_laws():
     except Exception as e:
         app.logger.error(f"Error loading laws from directory: {str(e)}")
     return laws
+def generate_embeddings(chunks):
+    """
+    Generate embeddings for a list of text chunks using Cohere's API.
 
+    Parameters:
+        chunks (List[str]): List of text chunks.
+
+    Returns:
+        List[np.ndarray]: List of embeddings for each chunk.
+    """
+    try:
+        return co.embed(texts=chunks).embeddings
+    except Exception as e:
+        logging.error(f"Error generating embeddings: {str(e)}")
+        return []
+
+def generate_embeddings_with_retry(chunks, retries=3):
+    """
+    Generate embeddings with retry logic in case of transient errors.
+
+    Parameters:
+        chunks (List[str]): List of text chunks to generate embeddings for.
+        retries (int): Number of retry attempts in case of failure.
+
+    Returns:
+        List[List[float]]: List of embeddings for each chunk.
+    """
+    for attempt in range(retries):
+        try:
+            return co.embed(texts=chunks).embeddings
+        except Exception as e:
+            logging.warning(f"Embedding generation attempt {attempt + 1} failed: {str(e)}")
+            time.sleep(2 ** attempt)  # Exponential backoff
+    logging.error("All embedding generation attempts failed.")
+    return [] 
+ 
 def chunk_text(text, max_tokens=512):
     """
     Split text into chunks of at most `max_tokens` tokens, ensuring no chunk exceeds the limit.
@@ -239,6 +286,9 @@ def contract_compliance():
         except Exception as e:
             app.logger.error(f"Failed to read file: {str(e)}")
             return jsonify({"error": f"Failed to read the uploaded file: {str(e)}"}), 500
+        finally:
+            if os.path.exists(file_path):
+                os.remove(file_path)  # Ensure cleanup happens
 
         # Process laws and compliance check
         selected_laws = request.form.getlist("selected_laws")
@@ -249,30 +299,27 @@ def contract_compliance():
             if law_id in laws:
                 law_text = laws[law_id]
                 try:
-                    # Chunk the user content and law text
-                    user_chunks = chunk_text(user_content, max_tokens=512)
-                    law_chunks = chunk_text(law_text, max_tokens=512)
+                    # Chunk the user content and law text, filtering out empty chunks
+                    user_chunks = [chunk for chunk in chunk_text(user_content, max_tokens=512) if chunk.strip()]
+                    law_chunks = [chunk for chunk in chunk_text(law_text, max_tokens=512) if chunk.strip()]
 
-                    # Log chunk details for debugging
+                    # Add debug logging for insights
+                    app.logger.debug(f"Raw user text length: {len(user_content)}")
+                    app.logger.debug(f"Raw law text length: {len(law_text)}")
+                    app.logger.debug(f"First user chunk: {user_chunks[0] if user_chunks else 'N/A'}")
+
                     app.logger.info(f"Number of user_chunks: {len(user_chunks)}")
-                    for idx, chunk in enumerate(user_chunks):
-                        chunk_size = len(tiktoken.get_encoding("cl100k_base").encode(chunk))
-                        app.logger.debug(f"User chunk {idx + 1}: {chunk_size} tokens.")
-
                     app.logger.info(f"Number of law_chunks: {len(law_chunks)}")
-                    for idx, chunk in enumerate(law_chunks):
-                        chunk_size = len(tiktoken.get_encoding("cl100k_base").encode(chunk))
-                        app.logger.debug(f"Law chunk {idx + 1}: {chunk_size} tokens.")
 
-                    # Generate embeddings for all chunks
-                    user_embeddings = co.embed(texts=user_chunks).embeddings
-                    law_embeddings = co.embed(texts=law_chunks).embeddings
+                    # Generate embeddings and validate
+                    user_embeddings = generate_embeddings_with_retry(user_chunks)
+                    law_embeddings = generate_embeddings_with_retry(law_chunks)
+                    if not user_embeddings or not law_embeddings:
+                        raise ValueError("Failed to generate embeddings.")
 
-                    # Aggregate embeddings
+                    # Aggregate embeddings and compute similarity
                     user_vector = np.mean(user_embeddings, axis=0)
                     law_vector = np.mean(law_embeddings, axis=0)
-
-                    # Compute cosine similarity
                     similarity = cosine_similarity([user_vector], [law_vector])[0][0]
 
                     compliance_results.append({
