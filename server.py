@@ -74,32 +74,37 @@ def load_laws():
 import tiktoken
 
 def chunk_text(text, max_tokens=512):
-    """Split text into chunks of at most `max_tokens` tokens."""
+    """
+    Split text into chunks of at most `max_tokens` tokens, ensuring no chunk exceeds the limit.
+    """
     tokenizer = tiktoken.get_encoding("cl100k_base")
     tokens = tokenizer.encode(text)  # Encode the text into tokens
     chunks = []
     current_chunk = []
 
     for token in tokens:
-        current_chunk.append(token)
-        # If adding the token exceeds the limit, save the chunk
-        if len(current_chunk) >= max_tokens:
+        if len(current_chunk) + 1 > max_tokens:
+            # Finalize the current chunk and start a new one
             chunks.append(tokenizer.decode(current_chunk))
-            current_chunk = []  # Start a new chunk
+            current_chunk = []
+
+        current_chunk.append(token)
 
     # Add any remaining tokens as the last chunk
     if current_chunk:
         chunks.append(tokenizer.decode(current_chunk))
 
-    # Validate chunks to ensure they are under the limit
+    # Validate chunks to ensure they are under the limit, truncating oversized ones
+    valid_chunks = []
     for i, chunk in enumerate(chunks):
-        chunk_length = len(tokenizer.encode(chunk))
-        if chunk_length > max_tokens:
-            raise ValueError(
-                f"Chunk {i} exceeds max token limit ({chunk_length} > {max_tokens})."
-            )
+        chunk_tokens = tokenizer.encode(chunk)
+        if len(chunk_tokens) > max_tokens:
+            # Truncate the chunk to the max_tokens limit
+            valid_chunks.append(tokenizer.decode(chunk_tokens[:max_tokens]))
+        else:
+            valid_chunks.append(chunk)
 
-    return chunks
+    return valid_chunks
 
 @app.route("/api/sign-in", methods=["POST"])
 def sign_in():
@@ -187,6 +192,10 @@ def contract_compliance():
                     # Chunk the user content and law text
                     user_chunks = chunk_text(user_content, max_tokens=512)
                     law_chunks = chunk_text(law_text, max_tokens=512)
+                    
+                    # Validate lengths
+validate_chunk_length(user_chunks)
+validate_chunk_length(law_chunks)
 
                     # Log chunk details for debugging
                     app.logger.info(f"Number of user_chunks: {len(user_chunks)}")
