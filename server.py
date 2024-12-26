@@ -71,6 +71,8 @@ def load_laws():
         app.logger.error(f"Error loading laws from directory: {str(e)}")
     return laws
 
+import tiktoken
+
 def chunk_text(text, max_tokens=512):
     """Split text into chunks of at most `max_tokens` tokens."""
     tokenizer = tiktoken.get_encoding("cl100k_base")
@@ -89,9 +91,15 @@ def chunk_text(text, max_tokens=512):
     if current_chunk:
         chunks.append(tokenizer.decode(current_chunk))
 
+    # Validate chunks to ensure they are under the limit
+    for i, chunk in enumerate(chunks):
+        chunk_length = len(tokenizer.encode(chunk))
+        if chunk_length > max_tokens:
+            raise ValueError(
+                f"Chunk {i} exceeds max token limit ({chunk_length} > {max_tokens})."
+            )
+
     return chunks
-
-
 
 @app.route("/api/sign-in", methods=["POST"])
 def sign_in():
