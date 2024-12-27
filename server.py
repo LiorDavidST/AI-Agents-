@@ -94,7 +94,7 @@ def chunk_text(text, max_tokens=512):
 
     # Validate chunks to ensure they are under the limit, truncating oversized ones
     valid_chunks = []
-    for i, chunk in enumerate(chunks)
+    for i, chunk in enumerate(chunks):
         chunk_tokens = tokenizer.encode(chunk)
         if len(chunk_tokens) > max_tokens:
             # Truncate the chunk to the max_tokens limit
