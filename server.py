@@ -70,6 +70,23 @@ def load_laws():
     except Exception as e:
         app.logger.error(f"Error loading laws from directory: {str(e)}")
     return laws
+    
+def validate_chunk_length(chunks, max_tokens=512):
+    """
+    Validate that all chunks are within the maximum token limit.
+
+    Parameters:
+        chunks (list of str): The list of text chunks to validate.
+        max_tokens (int): The maximum allowed tokens per chunk.
+
+    Raises:
+        ValueError: If any chunk exceeds the max token limit.
+    """
+    tokenizer = tiktoken.get_encoding("cl100k_base")
+    for i, chunk in enumerate(chunks):
+        chunk_length = len(tokenizer.encode(chunk))
+        if chunk_length > max_tokens:
+            raise ValueError(f"Chunk {i} exceeds max token limit ({chunk_length} > {max_tokens}).")
 
 def chunk_text(text, max_tokens=512):
     """
@@ -109,7 +126,7 @@ def chunk_text(text, max_tokens=512):
         app.logger.debug(f"Chunk {i} has {chunk_length} tokens.")
 
     return valid_chunks
-
+    
 @app.route("/api/sign-in", methods=["POST"])
 def sign_in():
     data = request.json
