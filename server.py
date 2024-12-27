@@ -106,6 +106,10 @@ def chunk_text(text, max_tokens=512):
     for i, chunk in enumerate(valid_chunks):
         app.logger.debug(f"Chunk {i} has {len(tokenizer.encode(chunk))} tokens.")
 
+    # Log chunk details for debugging
+    for i, chunk in enumerate(valid_chunks):
+        app.logger.debug(f"Chunk {i} has {len(tokenizer.encode(chunk))} tokens.")
+        
     return valid_chunks
 
 @app.route("/api/sign-in", methods=["POST"])
