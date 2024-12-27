@@ -80,6 +80,7 @@ def chunk_text(text, max_tokens=512):
     chunks = []
     current_chunk = []
 
+    # Create chunks
     for token in tokens:
         if len(current_chunk) + 1 > max_tokens:
             # Finalize the current chunk and start a new one
@@ -94,7 +95,7 @@ def chunk_text(text, max_tokens=512):
 
     # Validate chunks to ensure they are under the limit, truncating oversized ones
     valid_chunks = []
-    for i, chunk in enumerate(chunks):
+    for chunk in chunks:
         chunk_tokens = tokenizer.encode(chunk)
         if len(chunk_tokens) > max_tokens:
             # Truncate the chunk to the max_tokens limit
@@ -104,12 +105,9 @@ def chunk_text(text, max_tokens=512):
 
     # Log chunk details for debugging
     for i, chunk in enumerate(valid_chunks):
-        app.logger.debug(f"Chunk {i} has {len(tokenizer.encode(chunk))} tokens.")
+        chunk_length = len(tokenizer.encode(chunk))
+        app.logger.debug(f"Chunk {i} has {chunk_length} tokens.")
 
-    # Log chunk details for debugging
-    for i, chunk in enumerate(valid_chunks):
-        app.logger.debug(f"Chunk {i} has {len(tokenizer.encode(chunk))} tokens.")
-        
     return valid_chunks
 
 @app.route("/api/sign-in", methods=["POST"])
