@@ -71,8 +71,6 @@ def load_laws():
         app.logger.error(f"Error loading laws from directory: {str(e)}")
     return laws
 
-import tiktoken
-
 def chunk_text(text, max_tokens=512):
     """
     Split text into chunks of at most `max_tokens` tokens, ensuring no chunk exceeds the limit.
@@ -96,13 +94,17 @@ def chunk_text(text, max_tokens=512):
 
     # Validate chunks to ensure they are under the limit, truncating oversized ones
     valid_chunks = []
-    for i, chunk in enumerate(chunks):
+    for i, chunk in enumerate(chunks)
         chunk_tokens = tokenizer.encode(chunk)
         if len(chunk_tokens) > max_tokens:
             # Truncate the chunk to the max_tokens limit
             valid_chunks.append(tokenizer.decode(chunk_tokens[:max_tokens]))
         else:
             valid_chunks.append(chunk)
+
+    # Log chunk details for debugging
+    for i, chunk in enumerate(valid_chunks):
+        app.logger.debug(f"Chunk {i} has {len(tokenizer.encode(chunk))} tokens.")
 
     return valid_chunks
 
@@ -179,6 +181,10 @@ def contract_compliance():
         except Exception as e:
             app.logger.error(f"Failed to read file: {str(e)}")
             return jsonify({"error": f"Failed to read the uploaded file: {str(e)}"}), 500
+        finally:
+            # Ensure the file is removed after processing
+            if os.path.exists(file_path):
+                os.remove(file_path)
 
         # Process laws and compliance check
         selected_laws = request.form.getlist("selected_laws")
@@ -192,10 +198,14 @@ def contract_compliance():
                     # Chunk the user content and law text
                     user_chunks = chunk_text(user_content, max_tokens=512)
                     law_chunks = chunk_text(law_text, max_tokens=512)
-                    
-                    # Validate lengths
-validate_chunk_length(user_chunks)
-validate_chunk_length(law_chunks)
+
+                    # Validate chunk lengths
+                    try:
+                        validate_chunk_length(user_chunks)
+                        validate_chunk_length(law_chunks)
+                    except ValueError as e:
+                        app.logger.error(f"Chunk validation failed: {e}")
+                        return jsonify({"error": f"Chunk validation error: {str(e)}"}), 400
 
                     # Log chunk details for debugging
                     app.logger.info(f"Number of user_chunks: {len(user_chunks)}")
