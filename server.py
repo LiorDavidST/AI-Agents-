@@ -85,8 +85,10 @@ def validate_chunk_length(chunks, max_tokens=512):
     tokenizer = tiktoken.get_encoding("cl100k_base")
     for i, chunk in enumerate(chunks):
         chunk_length = len(tokenizer.encode(chunk))
+        app.logger.debug(f"Validating chunk {i}: {chunk_length} tokens.")  # Debug log
         if chunk_length > max_tokens:
             raise ValueError(f"Chunk {i} exceeds max token limit ({chunk_length} > {max_tokens}).")
+
 
 def chunk_text(text, max_tokens=512):
     """
@@ -94,38 +96,42 @@ def chunk_text(text, max_tokens=512):
     """
     tokenizer = tiktoken.get_encoding("cl100k_base")
     tokens = tokenizer.encode(text)  # Encode the text into tokens
+
+    if not tokens:
+        app.logger.error("Text could not be tokenized. Ensure the input is valid.")
+        return []
+
     chunks = []
     current_chunk = []
 
     # Create chunks
     for token in tokens:
         if len(current_chunk) + 1 > max_tokens:
-            # Finalize the current chunk and start a new one
-            chunks.append(tokenizer.decode(current_chunk))
+            chunks.append(tokenizer.decode(current_chunk))  # Finalize the current chunk
             current_chunk = []
 
         current_chunk.append(token)
 
-    # Add any remaining tokens as the last chunk
     if current_chunk:
-        chunks.append(tokenizer.decode(current_chunk))
+        chunks.append(tokenizer.decode(current_chunk))  # Add remaining tokens
 
-    # Validate chunks to ensure they are under the limit, truncating oversized ones
+    # Validate and truncate oversized chunks
     valid_chunks = []
-    for chunk in chunks:
+    for i, chunk in enumerate(chunks):
         chunk_tokens = tokenizer.encode(chunk)
         if len(chunk_tokens) > max_tokens:
-            # Truncate the chunk to the max_tokens limit
             valid_chunks.append(tokenizer.decode(chunk_tokens[:max_tokens]))
+            app.logger.warning(f"Chunk {i} truncated to {max_tokens} tokens.")
         else:
             valid_chunks.append(chunk)
 
-    # Log chunk details for debugging
+    # Debug logging for chunk details
     for i, chunk in enumerate(valid_chunks):
         chunk_length = len(tokenizer.encode(chunk))
         app.logger.debug(f"Chunk {i} has {chunk_length} tokens.")
 
     return valid_chunks
+
     
 @app.route("/api/sign-in", methods=["POST"])
 def sign_in():
