@@ -10,9 +10,6 @@ import jwt
 from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
 import tiktoken
-import unicodedata
-import re
-from typing import List
 
 app = Flask(__name__)
 
@@ -36,138 +33,7 @@ JWT_SECRET = os.environ.get("JWT_SECRET", "JWT_secret_key")
 JWT_EXPIRATION_MINUTES = int(os.environ.get("JWT_EXPIRATION_MINUTES", 30))
 co = cohere.Client(COHERE_API_KEY)
 
-# Enhanced text processing functions
-def normalize_unicode_text(text: str) -> str:
-    """
-    Normalize Unicode text to ensure consistent handling.
-    """
-    normalized = unicodedata.normalize('NFKC', text)
-    cleaned = re.sub(r'[\p{C}-\s]', '', normalized, flags=re.UNICODE)
-    return cleaned
-
-def estimate_token_overhead(text: str) -> int:
-    """
-    Estimate potential token overhead for texts with special characters.
-    """
-    non_ascii_count = sum(1 for char in text if ord(char) > 127)
-    hebrew_count = sum(1 for char in text if '\u0590' <= char <= '\u05FF')
-    
-    base_margin = 5
-    special_char_margin = (non_ascii_count // 100) * 2
-    hebrew_margin = (hebrew_count // 50) * 3
-    
-    return base_margin + special_char_margin + hebrew_margin
-
-def chunk_text(text: str, max_tokens: int = 512) -> List[str]:
-    """
-    Split text into chunks with improved handling for Unicode and Hebrew text.
-    """
-    tokenizer = tiktoken.get_encoding("cl100k_base")
-    
-    if not text or not isinstance(text, str):
-        app.logger.error("Invalid input: text must be a non-empty string")
-        return []
-    
-    # Normalize the text
-    text = normalize_unicode_text(text)
-    
-    # Calculate dynamic safety margin
-    safety_margin = estimate_token_overhead(text)
-    effective_max = max_tokens - safety_margin
-    
-    app.logger.debug(f"Using safety margin of {safety_margin} tokens for special character handling")
-    
-    try:
-        tokens = tokenizer.encode(text)
-    except Exception as e:
-        app.logger.error(f"Tokenization failed: {str(e)}")
-        return []
-    
-    chunks: List[str] = []
-    current_tokens: List[int] = []
-    current_length = 0
-    
-    for token in tokens:
-        if current_length >= effective_max:
-            try:
-                chunk_text = tokenizer.decode(current_tokens)
-                verification_length = len(tokenizer.encode(chunk_text))
-                
-                if verification_length > max_tokens:
-                    truncation_target = max_tokens - safety_margin
-                    truncated_tokens = current_tokens[:truncation_target]
-                    chunk_text = tokenizer.decode(truncated_tokens)
-                    
-                    final_verification = len(tokenizer.encode(chunk_text))
-                    if final_verification > max_tokens:
-                        chunk_text = tokenizer.decode(truncated_tokens[:-safety_margin])
-                        app.logger.warning(
-                            f"Emergency truncation applied: {verification_length} → {final_verification} tokens"
-                        )
-                
-                chunks.append(chunk_text)
-                current_tokens = []
-                current_length = 0
-                
-            except Exception as e:
-                app.logger.error(f"Chunk processing failed: {str(e)}")
-                current_tokens = []
-                current_length = 0
-                continue
-        
-        current_tokens.append(token)
-        current_length += 1
-    
-    if current_tokens:
-        try:
-            last_chunk = tokenizer.decode(current_tokens)
-            verification_length = len(tokenizer.encode(last_chunk))
-            
-            if verification_length > max_tokens:
-                truncation_target = max_tokens - safety_margin
-                truncated_tokens = current_tokens[:truncation_target]
-                last_chunk = tokenizer.decode(truncated_tokens)
-            
-            chunks.append(last_chunk)
-            
-        except Exception as e:
-            app.logger.error(f"Final chunk processing failed: {str(e)}")
-    
-    return chunks
-
-def validate_chunk_length(chunks: List[str], max_tokens: int = 512) -> bool:
-    """
-    Validate chunks with improved reporting for Unicode content.
-    """
-    tokenizer = tiktoken.get_encoding("cl100k_base")
-    
-    for i, chunk in enumerate(chunks):
-        try:
-            chunk_length = len(tokenizer.encode(chunk))
-            hebrew_chars = sum(1 for c in chunk if '\u0590' <= c <= '\u05FF')
-            non_ascii = sum(1 for c in chunk if ord(c) > 127)
-            
-            app.logger.debug(
-                f"Chunk {i}: {chunk_length} tokens, "
-                f"{hebrew_chars} Hebrew chars, "
-                f"{non_ascii} non-ASCII chars"
-            )
-            
-            if chunk_length > max_tokens:
-                app.logger.error(
-                    f"Validation failed: Chunk {i} exceeds limit "
-                    f"({chunk_length} > {max_tokens}). "
-                    f"Contains {hebrew_chars} Hebrew characters"
-                )
-                return False
-                
-        except Exception as e:
-            app.logger.error(f"Validation error in chunk {i}: {str(e)}")
-            return False
-            
-    return True
-
-# Keep your existing helper functions
+# Helper Functions
 def generate_token(email):
     expiration = datetime.utcnow() + timedelta(minutes=JWT_EXPIRATION_MINUTES)
     return jwt.encode({"email": email, "exp": expiration}, JWT_SECRET, algorithm="HS256")
@@ -191,10 +57,7 @@ def load_laws():
                 file_path = os.path.join(LAWS_FOLDER, filename)
                 try:
                     with open(file_path, "r", encoding="utf-8") as file:
-                        content = file.read()
-                        # Normalize the law text
-                        content = normalize_unicode_text(content)
-                        laws[law_id] = content
+                        laws[law_id] = file.read()
                     app.logger.info(f"Successfully loaded law file: {filename}")
                 except UnicodeDecodeError:
                     app.logger.error(f"Failed to decode file {filename}. Ensure it's UTF-8 encoded.")
@@ -207,8 +70,113 @@ def load_laws():
     except Exception as e:
         app.logger.error(f"Error loading laws from directory: {str(e)}")
     return laws
+    
+def validate_chunk_length(chunks, max_tokens=512):
+    """
+    Validate that all chunks are within the maximum token limit.
 
-# Your existing routes remain the same, but update the contract-compliance route
+    Parameters:
+        chunks (list of str): The list of text chunks to validate.
+        max_tokens (int): The maximum allowed tokens per chunk.
+
+    Raises:
+        ValueError: If any chunk exceeds the max token limit.
+    """
+    tokenizer = tiktoken.get_encoding("cl100k_base")
+    for i, chunk in enumerate(chunks):
+        chunk_length = len(tokenizer.encode(chunk))
+        app.logger.debug(f"Validating chunk {i}: {chunk_length} tokens.")  # Debug log
+        if chunk_length > max_tokens:
+            raise ValueError(f"Chunk {i} exceeds max token limit ({chunk_length} > {max_tokens}).")
+
+
+def chunk_text(text, max_tokens=512):
+    """
+    Split text into chunks of at most `max_tokens` tokens, ensuring no chunk exceeds the limit.
+    Handles specific language encodings, including Hebrew.
+    """
+    tokenizer = tiktoken.get_encoding("cl100k_base")
+    tokens = tokenizer.encode(text)  # Encode the text into tokens
+
+    if not tokens:
+        app.logger.error("Text could not be tokenized. Ensure the input is valid.")
+        return []
+
+    chunks = []
+    current_chunk = []
+
+    # Create chunks
+    for token in tokens:
+        if len(current_chunk) + 1 > max_tokens:
+            chunks.append(tokenizer.decode(current_chunk))  # Finalize the current chunk
+            current_chunk = []
+
+        current_chunk.append(token)
+
+    if current_chunk:
+        chunks.append(tokenizer.decode(current_chunk))  # Add remaining tokens
+
+    # Validate and truncate oversized chunks
+    valid_chunks = []
+    for i, chunk in enumerate(chunks):
+        chunk_tokens = tokenizer.encode(chunk)
+        if len(chunk_tokens) > max_tokens:
+            valid_chunks.append(tokenizer.decode(chunk_tokens[:max_tokens]))
+            app.logger.warning(f"Chunk {i} truncated to {max_tokens} tokens (original: {len(chunk_tokens)}).")
+        else:
+            valid_chunks.append(chunk)
+
+    # Debug logging for chunk details
+    for i, chunk in enumerate(valid_chunks):
+        chunk_length = len(tokenizer.encode(chunk))
+        app.logger.debug(f"Chunk {i} has {chunk_length} tokens.")
+
+    # Handle empty valid chunks case
+    if not valid_chunks:
+        app.logger.error("All chunks are empty after processing. This may be due to language-specific encoding issues.")
+        return []
+
+    return valid_chunks
+
+    
+@app.route("/api/sign-in", methods=["POST"])
+def sign_in():
+    data = request.json
+    if not data or "email" not in data or "password" not in data:
+        return jsonify({"error": "Invalid input"}), 400
+
+    email = data["email"]
+    password = data["password"]
+
+    if len(password) < 8:
+        return jsonify({"error": "Password must be at least 8 characters"}), 400
+
+    if users_collection.find_one({"email": email}):
+        return jsonify({"error": f"The email '{email}' is already registered. Please log in or use a different email."}), 400
+
+    password_hash = generate_password_hash(password)
+    users_collection.insert_one({"email": email, "password_hash": password_hash})
+    return jsonify({"message": "Sign-up successful"}), 201
+
+@app.route("/api/login", methods=["POST"])
+def login():
+    data = request.json
+    if not data or "email" not in data or "password" not in data:
+        return jsonify({"error": "Invalid input"}), 400
+
+    email = data["email"]
+    password = data["password"]
+
+    user = users_collection.find_one({"email": email})
+    if not user:
+        return jsonify({"error": "Invalid email or password"}), 401
+
+    if check_password_hash(user["password_hash"], password):
+        token = generate_token(email)
+        return jsonify({"message": "Login successful", "token": token}), 200
+    else:
+        return jsonify({"error": "Invalid email or password"}), 401
+
 @app.route("/api/contract-compliance", methods=["POST"])
 def contract_compliance():
     try:
@@ -239,18 +207,17 @@ def contract_compliance():
                 file_content = f.read()
             try:
                 user_content = file_content.decode("utf-8")
-                # Normalize the user content
-                user_content = normalize_unicode_text(user_content)
             except UnicodeDecodeError:
                 user_content = file_content.decode("iso-8859-1")
-                user_content = normalize_unicode_text(user_content)
         except Exception as e:
             app.logger.error(f"Failed to read file: {str(e)}")
             return jsonify({"error": f"Failed to read the uploaded file: {str(e)}"}), 500
         finally:
+            # Ensure the file is removed after processing
             if os.path.exists(file_path):
                 os.remove(file_path)
 
+        # Process laws and compliance check
         selected_laws = request.form.getlist("selected_laws")
         laws = load_laws()
         compliance_results = []
@@ -259,15 +226,29 @@ def contract_compliance():
             if law_id in laws:
                 law_text = laws[law_id]
                 try:
-                    # Chunk both texts with improved handling
-                    user_chunks = chunk_text(user_content)
-                    law_chunks = chunk_text(law_text)
+                    # Chunk the user content and law text
+                    user_chunks = chunk_text(user_content, max_tokens=512)
+                    law_chunks = chunk_text(law_text, max_tokens=512)
 
-                    # Validate chunks
-                    if not validate_chunk_length(user_chunks) or not validate_chunk_length(law_chunks):
-                        raise ValueError("Chunk validation failed")
 
-                    # Log chunk details
+
+ # Check if user_chunks is empty or if chunks are oversized
+                    if not user_chunks:
+                        return jsonify({"error": "The uploaded text could not be processed. It may contain excessively long text sections or unsupported encoding."}), 400
+
+                    for chunk in user_chunks:
+                        if len(chunk) > max_tokens:
+                            app.logger.error("Oversized chunk detected. Adjust text or process smaller sections.")
+                            return jsonify({"error": "Uploaded text has oversized sections. Please adjust the input and try again."}), 400
+                    # Validate chunk lengths
+                    try:
+                        validate_chunk_length(user_chunks)
+                        validate_chunk_length(law_chunks)
+                    except ValueError as e:
+                        app.logger.error(f"Chunk validation failed: {e}")
+                        return jsonify({"error": f"Chunk validation error: {str(e)}"}), 400
+
+                    # Log chunk details for debugging
                     app.logger.info(f"Number of user_chunks: {len(user_chunks)}")
                     app.logger.info(f"Number of law_chunks: {len(law_chunks)}")
 
@@ -279,7 +260,7 @@ def contract_compliance():
                     user_vector = np.mean(user_embeddings, axis=0)
                     law_vector = np.mean(law_embeddings, axis=0)
 
-                    # Compute similarity
+                    # Compute cosine similarity
                     similarity = cosine_similarity([user_vector], [law_vector])[0][0]
 
                     compliance_results.append({
@@ -307,7 +288,8 @@ def contract_compliance():
         app.logger.error(f"Unexpected error in contract_compliance: {str(e)}")
         return jsonify({"error": "Internal server error", "details": str(e)}), 500
 
-# Keep your existing static file serving routes
+
+# Static File Serving
 @app.route("/", methods=["GET"])
 def serve_index():
     return send_from_directory(".", "index.html")
