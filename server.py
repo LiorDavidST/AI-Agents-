@@ -82,15 +82,34 @@ def validate_chunk_length(chunks, max_tokens):
         chunks (list of str): The list of text chunks to validate.
         max_tokens (int): The maximum allowed tokens per chunk.
 
+    Returns:
+        list: A list of validated chunks, with oversized chunks truncated if necessary.
+
     Raises:
-        ValueError: If any chunk exceeds the max token limit.
+        ValueError: If all chunks exceed the max token limit.
     """
     tokenizer = tiktoken.get_encoding("cl100k_base")
+    validated_chunks = []
+    all_chunks_invalid = True
+
     for i, chunk in enumerate(chunks):
-        chunk_length = len(tokenizer.encode(chunk))
+        chunk_tokens = tokenizer.encode(chunk)
+        chunk_length = len(chunk_tokens)
         app.logger.debug(f"Validating chunk {i}: {chunk_length} tokens.")  # Debug log
+
         if chunk_length > max_tokens:
-            raise ValueError(f"Chunk {i} exceeds max token limit ({chunk_length} > {max_tokens}).")
+            truncated_chunk = tokenizer.decode(chunk_tokens[:max_tokens])
+            app.logger.warning(f"Chunk {i} truncated to {max_tokens} tokens (original: {chunk_length}).")
+            validated_chunks.append(truncated_chunk)
+        else:
+            validated_chunks.append(chunk)
+            all_chunks_invalid = False  # At least one valid chunk
+
+    if all_chunks_invalid:
+        app.logger.error("All chunks exceed the maximum token limit after validation.")
+        raise ValueError("All chunks exceed the maximum token limit.")
+
+    return validated_chunks
 
 
 def chunk_text(text, max_tokens):
@@ -108,9 +127,9 @@ def chunk_text(text, max_tokens):
     chunks = []
     current_chunk = []
 
-    # Create chunks
+    # Create chunks strictly adhering to max_tokens limit
     for token in tokens:
-        if len(current_chunk) + 1 > max_tokens:
+        if len(current_chunk) >= max_tokens:  # Check if the current chunk is full
             chunks.append(tokenizer.decode(current_chunk))  # Finalize the current chunk
             current_chunk = []
 
@@ -119,12 +138,13 @@ def chunk_text(text, max_tokens):
     if current_chunk:
         chunks.append(tokenizer.decode(current_chunk))  # Add remaining tokens
 
-    # Validate and truncate oversized chunks
+    # Validate all chunks and truncate if needed
     valid_chunks = []
     for i, chunk in enumerate(chunks):
         chunk_tokens = tokenizer.encode(chunk)
         if len(chunk_tokens) > max_tokens:
-            valid_chunks.append(tokenizer.decode(chunk_tokens[:max_tokens]))
+            truncated_chunk = tokenizer.decode(chunk_tokens[:max_tokens])
+            valid_chunks.append(truncated_chunk)
             app.logger.warning(f"Chunk {i} truncated to {max_tokens} tokens (original: {len(chunk_tokens)}).")
         else:
             valid_chunks.append(chunk)
@@ -140,6 +160,7 @@ def chunk_text(text, max_tokens):
         return []
 
     return valid_chunks
+
 
     
 @app.route("/api/sign-in", methods=["POST"])
@@ -239,19 +260,10 @@ def contract_compliance():
                             "error": "The uploaded text could not be processed. It may contain excessively long text sections or unsupported encoding."
                         }), 400
 
-                    # Validate and handle oversized chunks
-                    for i, chunk in enumerate(user_chunks):
-                        chunk_length = len(tiktoken.get_encoding("cl100k_base").encode(chunk))
-                        if chunk_length > MAX_TOKENS:
-                            app.logger.error(f"Oversized chunk detected at index {i}. Adjust text or process smaller sections.")
-                            return jsonify({
-                                "error": "Uploaded text has oversized sections. Please adjust the input and try again."
-                            }), 400
-
                     # Validate chunk lengths for both user and law content
                     try:
-                        validate_chunk_length(user_chunks, MAX_TOKENS)
-                        validate_chunk_length(law_chunks, MAX_TOKENS)
+                        user_chunks = validate_chunk_length(user_chunks, MAX_TOKENS)
+                        law_chunks = validate_chunk_length(law_chunks, MAX_TOKENS)
                     except ValueError as e:
                         app.logger.error(f"Chunk validation failed: {e}")
                         return jsonify({"error": f"Chunk validation error: {str(e)}"}), 400
@@ -295,10 +307,6 @@ def contract_compliance():
     except Exception as e:
         app.logger.error(f"Unexpected error in contract_compliance: {str(e)}")
         return jsonify({"error": "Internal server error", "details": str(e)}), 500
-
-
-
-
 
 # Static File Serving
 @app.route("/", methods=["GET"])
