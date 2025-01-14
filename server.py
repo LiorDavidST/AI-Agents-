@@ -230,20 +230,19 @@ def contract_compliance():
                     user_chunks = chunk_text(user_content, max_tokens=512)
                     law_chunks = chunk_text(law_text, max_tokens=512)
 
-
-
- # Check if user_chunks is empty or if chunks are oversized
+                    # Check if user_chunks is empty or if chunks are oversized
                     if not user_chunks:
                         return jsonify({"error": "The uploaded text could not be processed. It may contain excessively long text sections or unsupported encoding."}), 400
 
                     for chunk in user_chunks:
-                        if len(chunk) > max_tokens:
+                        if len(chunk) > 512:  # Ensure max_tokens is defined or replace with a hardcoded value like 512
                             app.logger.error("Oversized chunk detected. Adjust text or process smaller sections.")
                             return jsonify({"error": "Uploaded text has oversized sections. Please adjust the input and try again."}), 400
+
                     # Validate chunk lengths
                     try:
-                        validate_chunk_length(user_chunks)
-                        validate_chunk_length(law_chunks)
+                        validate_chunk_length(user_chunks, max_tokens=512)
+                        validate_chunk_length(law_chunks, max_tokens=512)
                     except ValueError as e:
                         app.logger.error(f"Chunk validation failed: {e}")
                         return jsonify({"error": f"Chunk validation error: {str(e)}"}), 400
@@ -287,6 +286,7 @@ def contract_compliance():
     except Exception as e:
         app.logger.error(f"Unexpected error in contract_compliance: {str(e)}")
         return jsonify({"error": "Internal server error", "details": str(e)}), 500
+
 
 
 # Static File Serving
