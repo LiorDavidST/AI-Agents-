@@ -204,22 +204,21 @@ def contract_compliance():
         file_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
         file.save(file_path)
 
-# Read and decode the uploaded file
-try:
-    with open(file_path, "rb") as f:
-        file_content = f.read()
-    try:
-        user_content = file_content.decode("utf-8")  # Hebrew typically uses UTF-8
-    except UnicodeDecodeError:
-        user_content = file_content.decode("iso-8859-8")  # Alternative Hebrew encoding
-except Exception as e:
-    app.logger.error(f"Failed to read file: {str(e)}")
-    return jsonify({"error": f"Failed to read the uploaded file: {str(e)}"}), 500
-finally:
-    # Ensure the file is removed after processing
-    if os.path.exists(file_path):
-        os.remove(file_path)
-
+        # Read and decode the uploaded file
+        try:
+            with open(file_path, "rb") as f:
+                file_content = f.read()
+                try:
+                    user_content = file_content.decode("utf-8")  # Hebrew typically uses UTF-8
+                except UnicodeDecodeError:
+                    user_content = file_content.decode("iso-8859-8")  # Alternative Hebrew encoding
+        except Exception as e:
+            app.logger.error(f"Failed to read file: {str(e)}")
+            return jsonify({"error": f"Failed to read the uploaded file: {str(e)}"}), 500
+        finally:
+            # Ensure the file is removed after processing
+            if os.path.exists(file_path):
+                os.remove(file_path)
 
         # Process laws and compliance check
         selected_laws = request.form.getlist("selected_laws")
@@ -231,8 +230,8 @@ finally:
                 law_text = laws[law_id]
                 try:
                     # Chunk the user content and law text
-                    user_chunks = chunk_text(user_content, max_tokens)
-                    law_chunks = chunk_text(law_text, max_tokens)
+                    user_chunks = chunk_text(user_content, MAX_TOKENS)
+                    law_chunks = chunk_text(law_text, MAX_TOKENS)
 
                     # Check if user_chunks is empty
                     if not user_chunks:
@@ -251,8 +250,8 @@ finally:
 
                     # Validate chunk lengths for both user and law content
                     try:
-                        validate_chunk_length(user_chunks, max_tokens)
-                        validate_chunk_length(law_chunks, max_tokens)
+                        validate_chunk_length(user_chunks, MAX_TOKENS)
+                        validate_chunk_length(law_chunks, MAX_TOKENS)
                     except ValueError as e:
                         app.logger.error(f"Chunk validation failed: {e}")
                         return jsonify({"error": f"Chunk validation error: {str(e)}"}), 400
@@ -296,6 +295,7 @@ finally:
     except Exception as e:
         app.logger.error(f"Unexpected error in contract_compliance: {str(e)}")
         return jsonify({"error": "Internal server error", "details": str(e)}), 500
+
 
 
 
