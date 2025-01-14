@@ -22,6 +22,9 @@ LAWS_FOLDER = "HookeyMecher"
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
+# Define constants
+MAX_TOKENS = 512  # Maximum tokens per chunk for processing
+
 # MongoDB Configuration
 MONGO_URI = os.environ.get("MONGO_URI", "mongodb://localhost:27017/")
 client = MongoClient(MONGO_URI)
@@ -71,7 +74,7 @@ def load_laws():
         app.logger.error(f"Error loading laws from directory: {str(e)}")
     return laws
     
-def validate_chunk_length(chunks, max_tokens=512):
+def validate_chunk_length(chunks, max_tokens):
     """
     Validate that all chunks are within the maximum token limit.
 
@@ -90,7 +93,7 @@ def validate_chunk_length(chunks, max_tokens=512):
             raise ValueError(f"Chunk {i} exceeds max token limit ({chunk_length} > {max_tokens}).")
 
 
-def chunk_text(text, max_tokens=512):
+def chunk_text(text, max_tokens):
     """
     Split text into chunks of at most `max_tokens` tokens, ensuring no chunk exceeds the limit.
     Handles specific language encodings, including Hebrew.
@@ -201,21 +204,22 @@ def contract_compliance():
         file_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
         file.save(file_path)
 
-        # Read and decode the uploaded file
-        try:
-            with open(file_path, "rb") as f:
-                file_content = f.read()
-            try:
-                user_content = file_content.decode("utf-8")
-            except UnicodeDecodeError:
-                user_content = file_content.decode("iso-8859-1")
-        except Exception as e:
-            app.logger.error(f"Failed to read file: {str(e)}")
-            return jsonify({"error": f"Failed to read the uploaded file: {str(e)}"}), 500
-        finally:
-            # Ensure the file is removed after processing
-            if os.path.exists(file_path):
-                os.remove(file_path)
+# Read and decode the uploaded file
+try:
+    with open(file_path, "rb") as f:
+        file_content = f.read()
+    try:
+        user_content = file_content.decode("utf-8")  # Hebrew typically uses UTF-8
+    except UnicodeDecodeError:
+        user_content = file_content.decode("iso-8859-8")  # Alternative Hebrew encoding
+except Exception as e:
+    app.logger.error(f"Failed to read file: {str(e)}")
+    return jsonify({"error": f"Failed to read the uploaded file: {str(e)}"}), 500
+finally:
+    # Ensure the file is removed after processing
+    if os.path.exists(file_path):
+        os.remove(file_path)
+
 
         # Process laws and compliance check
         selected_laws = request.form.getlist("selected_laws")
@@ -227,22 +231,28 @@ def contract_compliance():
                 law_text = laws[law_id]
                 try:
                     # Chunk the user content and law text
-                    user_chunks = chunk_text(user_content, max_tokens=512)
-                    law_chunks = chunk_text(law_text, max_tokens=512)
+                    user_chunks = chunk_text(user_content, max_tokens)
+                    law_chunks = chunk_text(law_text, max_tokens)
 
-                    # Check if user_chunks is empty or if chunks are oversized
+                    # Check if user_chunks is empty
                     if not user_chunks:
-                        return jsonify({"error": "The uploaded text could not be processed. It may contain excessively long text sections or unsupported encoding."}), 400
+                        return jsonify({
+                            "error": "The uploaded text could not be processed. It may contain excessively long text sections or unsupported encoding."
+                        }), 400
 
-                    for chunk in user_chunks:
-                        if len(chunk) > 512:  # Ensure max_tokens is defined or replace with a hardcoded value like 512
-                            app.logger.error("Oversized chunk detected. Adjust text or process smaller sections.")
-                            return jsonify({"error": "Uploaded text has oversized sections. Please adjust the input and try again."}), 400
+                    # Validate and handle oversized chunks
+                    for i, chunk in enumerate(user_chunks):
+                        chunk_length = len(tiktoken.get_encoding("cl100k_base").encode(chunk))
+                        if chunk_length > MAX_TOKENS:
+                            app.logger.error(f"Oversized chunk detected at index {i}. Adjust text or process smaller sections.")
+                            return jsonify({
+                                "error": "Uploaded text has oversized sections. Please adjust the input and try again."
+                            }), 400
 
-                    # Validate chunk lengths
+                    # Validate chunk lengths for both user and law content
                     try:
-                        validate_chunk_length(user_chunks, max_tokens=512)
-                        validate_chunk_length(law_chunks, max_tokens=512)
+                        validate_chunk_length(user_chunks, max_tokens)
+                        validate_chunk_length(law_chunks, max_tokens)
                     except ValueError as e:
                         app.logger.error(f"Chunk validation failed: {e}")
                         return jsonify({"error": f"Chunk validation error: {str(e)}"}), 400
@@ -286,6 +296,7 @@ def contract_compliance():
     except Exception as e:
         app.logger.error(f"Unexpected error in contract_compliance: {str(e)}")
         return jsonify({"error": "Internal server error", "details": str(e)}), 500
+
 
 
 
