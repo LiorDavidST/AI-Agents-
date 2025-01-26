@@ -249,12 +249,25 @@ textarea {
 /* Results Section Styling */
 #results-section {
     margin: 20px auto;
-    padding: 20px;
-    max-width: 1200px;
+    padding: 25px;
+    width: 90%; /* Adjusted for responsiveness */
+    max-width: 1000px;
     background-color: var(--background-white);
     border: 1px solid #ddd;
-    border-radius: 12px;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    border-radius: 15px; /* Slightly more rounded corners for modern look */
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); /* Softer shadow for depth */
+    display: flex;
+    flex-direction: column;
+    gap: 20px; /* Added spacing between section title and table */
+}
+
+/* Results Section Title */
+#results-section h2 {
+    font-size: 20px;
+    font-weight: bold;
+    color: var(--primary-color);
+    text-align: center;
+    margin: 0;
 }
 
 /* Results Table Styling */
@@ -262,7 +275,7 @@ textarea {
     width: 100%;
     border-collapse: collapse;
     font-family: 'Roboto', Arial, sans-serif;
-    font-size: 16px;
+    font-size: 15px;
     color: var(--text-color);
 }
 
@@ -274,30 +287,39 @@ textarea {
 
 #results-table th,
 #results-table td {
-    padding: 12px 15px;
+    padding: 15px; /* Increased padding for better spacing */
     border: 1px solid #ddd;
     text-align: left;
+    word-wrap: break-word; /* Ensure content doesn't overflow */
+    font-size: 14px;
+}
+
+#results-table th {
+    font-weight: 600; /* Slightly bolder header text */
 }
 
 #results-table tbody tr:nth-child(even) {
-    background-color: #f2f2f2; /* Light gray for even rows */
+    background-color: var(--background-light); /* Using a consistent light background color */
 }
 
 #results-table tbody tr:hover {
-    background-color: #e1f5fe; /* Light blue hover effect */
-    cursor: default;
+    background-color: var(--user-color); /* Light blue hover effect for clarity */
+    cursor: pointer; /* Highlight rows as interactive */
 }
 
-/* Responsive Table for Small Screens */
+/* Responsive Adjustments */
 @media (max-width: 768px) {
-    #results-table {
-        font-size: 14px;
+    #results-section {
+        padding: 15px; /* Adjust padding for smaller screens */
     }
 
-    #results-section {
-        padding: 10px;
+    #results-table th,
+    #results-table td {
+        padding: 10px; /* Reduce padding for better compactness */
+        font-size: 13px;
     }
 }
+
 
 /* Feedback Section (Optional for feedback messages) */
 #feedback {
